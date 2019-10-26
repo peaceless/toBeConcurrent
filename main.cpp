@@ -1,12 +1,54 @@
-#include "objectasthreadarg.h"
+//#include "objectasthreadarg.h"
+#include <future>
+#include <string>
+#include <typeinfo>
+#include <iostream>
+#include <unistd.h>
+/*struct P
+{
+    void foo(int, std::string const&){}
+    std::string bar(std::string const&){
+        return "hello";
+    }
+};
 
+void process_connections(connection_set& connection)
+{
+    while(!done(connections))
+    {
+        for (connection_iterator connection = connections.begin(),
+             end = connections.end(); connection != end; ++connection)
+        {
+            if (connection->has_incoming_data())
+            {
+                data_packet data = connection->incoming();
+                std::promise<payload_type>& p=connection->get_promise(data.id);
+                p.set_value(data.payload);
+            }
+            if (connection->has_outgoing_data())
+            {
+                outgoing_packet data = connection->top_of_outgoing_queue();
+                connection->send(data.payload);
+                data.promise.set_value(true);
+            }
+        }
+    }
+}
+
+int test()
+{
+    std::cout << std::this_thread::get_id() << std::endl;
+    return 0;
+}*/
+#include <atomic>
+std::atomic_flag test = ATOMIC_FLAG_INIT;
 int main()
 {
-    ObjectAsThreadArg x;
-    std::cout << "----------" << std::endl;
-    std::thread t(x);
-    std::cout << "----------" << std::endl;
-    t.join();
+    std::cout << test.test_and_set() << std::endl;
+//    std::packaged_task<int()> task(test);
+//    auto res = task.get_future();
+//    task();
+//    std::cout << res.get();
     return 0;
 }
 //#include <iostream>
