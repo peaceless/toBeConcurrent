@@ -9,26 +9,12 @@
 #include <errno.h>
 #include <string.h> // for bzero
 
+#include "event.cpp"
 #define MAXLINE 5
 #define OPEN_MAX 100
 #define LISTENQ 20
 #define SERV_PORT 5000
 #define INFTIM 1000
-
-void setNonBlocking(int sock)
-{
-    int opts;
-    opts = fcntl(sock, F_GETFL);
-    if (opts < 0) {
-        perror("fcntl(sock, GETFL)");
-        exit(1);
-    }
-    opts = opts | O_NONBLOCK;
-    if (fcntl(sock, F_SETFL, opts) < 0) {
-        perror("fcntl(sock, SETFL, opts)");
-        exit(1);
-    }
-}
 
 int main(int argc, char* argv[])
 {
@@ -54,9 +40,9 @@ int main(int argc, char* argv[])
     struct sockaddr_in clientaddr;
     struct sockaddr_in serveraddr;
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    Event event(listenfd);
 
     // 把socket设置为非阻塞式
-    setNonBlocking(listenfd);
     // 设置要处理的事件相关的描述符
     ev.data.fd = listenfd;
     // 设置要处理的事件类型
@@ -85,7 +71,7 @@ int main(int argc, char* argv[])
                     perror("connfd < 0");
                     exit(1);
                 }
-                setNonBlocking(connfd);
+                event.handle();
                 char *str = inet_ntoa(clientaddr.sin_addr);
                 std::cout << "accept a connection from " << str << std::endl;
                 // 设置用于读操作的文件描述符
