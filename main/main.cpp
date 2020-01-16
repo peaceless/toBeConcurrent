@@ -8,16 +8,19 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h> // for bzero
+#include <thread>
 
-#include "event.cpp"
+//#include "event.cpp"
 #define MAXLINE 5
 #define OPEN_MAX 100
 #define LISTENQ 20
 #define SERV_PORT 5000
 #define INFTIM 1000
+extern void clientRun();
 
 int main(int argc, char* argv[])
 {
+    std::cout << "get start" << std::endl;
     int i, maxi, listenfd, connfd, sockfd, epfd, nfds, portnum;
     ssize_t n;
     char line[MAXLINE];
@@ -40,7 +43,7 @@ int main(int argc, char* argv[])
     struct sockaddr_in clientaddr;
     struct sockaddr_in serveraddr;
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
-    Event event(listenfd);
+//    Event event(listenfd);
 
     // 把socket设置为非阻塞式
     // 设置要处理的事件相关的描述符
@@ -53,16 +56,22 @@ int main(int argc, char* argv[])
     bzero(&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     char* local_addr = "127.0.0.1";
-    inet_aton(local_addr, &(serveraddr.sin_addr));
+    serveraddr.sin_addr.s_addr = inet_addr(local_addr);
+    // inet_aton(local_addr, &(serveraddr.sin_addr));
 
-    serveraddr.sin_port = htons(portnum);
+    serveraddr.sin_port = htons(8000);
     bind(listenfd, reinterpret_cast<sockaddr *>(&serveraddr), sizeof(serveraddr));
     listen(listenfd, LISTENQ);
+    std::cout << "listen sock is" << listenfd << std::endl;
     maxi = 0;
+    connfd = accept(listenfd, reinterpret_cast<sockaddr *>(&clientaddr), &clilen);
+    std::cout << connfd << "connfd is " << std::endl;
+    //std::thread t(clientRun);
     while(true) {
         // 等待epoll事件的发生
         nfds = epoll_wait(epfd, events, 20, 500);
 
+        std::cout << "endless loop" << nfds << std::endl;
         // 处理发生的事件
         for (i = 0; i < nfds; ++i) {
             if (events[i].data.fd == listenfd) {
@@ -71,9 +80,9 @@ int main(int argc, char* argv[])
                     perror("connfd < 0");
                     exit(1);
                 }
-                event.handle();
+     //           event.handle();
                 char *str = inet_ntoa(clientaddr.sin_addr);
-                std::cout << "accept a connection from " << str << std::endl;
+                std::cout << "++" << connfd << std::endl;
                 // 设置用于读操作的文件描述符
                 ev.data.fd = connfd;
                 // 设置用于注册的读操作事件
@@ -91,16 +100,19 @@ int main(int argc, char* argv[])
                     } else
                         std::cout << "readline error " << std::endl;
                 } else if (n == 0) {
-                    close(sockfd);
+                    // close(sockfd);
                     events[i].data.fd = -1;
                 }
                 line[n] = '\0';
-                std::cout << "read " << line << std::endl;
+                //std::cout << "read " << line << std::endl;
             } else if (events[i].events & EPOLLOUT) {
                 sockfd = events[i].data.fd;
-                write(sockfd, line, n);
+                //write(sockfd, line, n);
+            } else {
+                std::cout << "unknown state" << events[i].data.fd << std::endl;
             }
         }
     }
+    // t.join();
     return 0;
 }
