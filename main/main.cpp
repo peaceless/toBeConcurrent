@@ -1,118 +1,33 @@
 #include <iostream>
-#include <sys/socket.h>
-#include <sys/epoll.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h> // for bzero
 #include <thread>
-
-//#include "event.cpp"
-#define MAXLINE 5
-#define OPEN_MAX 100
-#define LISTENQ 20
-#define SERV_PORT 5000
-#define INFTIM 1000
-extern void clientRun();
+#include <stdlib.h>
+#include <time.h>
+#include "../event/event.h"
+#include "../event/loopEvent.h"
 
 int main(int argc, char* argv[])
 {
-    std::cout << "get start" << std::endl;
-    int i, maxi, listenfd, connfd, sockfd, epfd, nfds, portnum;
-    ssize_t n;
-    char line[MAXLINE];
-    socklen_t clilen;
+    std::shared_ptr<ThreadSafeQueue<Event>> th = std::make_shared<ThreadSafeQueue<Event> >();
+    std::string address = "127.0.0.1";
+    int listen_port = 8080;
+    int sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    struct sockaddr_in server_address;
 
-    if (2 == argc) {
-        if ((portnum = atoi(argv[1])) < 0) {
-            fprintf(stderr, "Usage:%s portnumber\a\n", argv[0]);
-            return 1;
-        }
-    } else {
-        fprintf(stderr, "Usage:%s portnumber\a\n", argv[0]);
-        return 1;
-    }
+    bzero(&server_address, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr(address.c_str());
+    server_address.sin_port = htons(listen_port);
 
-    // 声明epoll_event结构体变量，ev用于注册事件，数组用于回传待处理事件
-    struct epoll_event ev, events[20];
-    // 生成用以accept的文件描述符
-    epfd = epoll_create(256);
-    struct sockaddr_in clientaddr;
-    struct sockaddr_in serveraddr;
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
-//    Event event(listenfd);
+    bind(sockfd, reinterpret_cast<sockaddr *>(&server_address), sizeof(server_address));
+    Acceptor ac(sockfd, 500, th);
+    ac.init("127.0.0.1", 8080);
+    std::thread t2(&Acceptor::handle,ac);
 
-    // 把socket设置为非阻塞式
-    // 设置要处理的事件相关的描述符
-    ev.data.fd = listenfd;
-    // 设置要处理的事件类型
-    ev.events = EPOLLIN | EPOLLET;
+    int epfd = epoll_create(500);
+    loopEvent le(epfd, th);
+    std::thread t1(le);
+    t1.join();
+    t2.join();
 
-    // 注册epoll事件
-    epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
-    bzero(&serveraddr, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
-    char* local_addr = "127.0.0.1";
-    serveraddr.sin_addr.s_addr = inet_addr(local_addr);
-    // inet_aton(local_addr, &(serveraddr.sin_addr));
-
-    serveraddr.sin_port = htons(8000);
-    bind(listenfd, reinterpret_cast<sockaddr *>(&serveraddr), sizeof(serveraddr));
-    listen(listenfd, LISTENQ);
-    std::cout << "listen sock is" << listenfd << std::endl;
-    maxi = 0;
-    connfd = accept(listenfd, reinterpret_cast<sockaddr *>(&clientaddr), &clilen);
-    std::cout << connfd << "connfd is " << std::endl;
-    //std::thread t(clientRun);
-    while(true) {
-        // 等待epoll事件的发生
-        nfds = epoll_wait(epfd, events, 20, 500);
-
-        std::cout << "endless loop" << nfds << std::endl;
-        // 处理发生的事件
-        for (i = 0; i < nfds; ++i) {
-            if (events[i].data.fd == listenfd) {
-                connfd = accept(listenfd, reinterpret_cast<sockaddr*>(&clientaddr), &clilen);
-                if (connfd < 0) {
-                    perror("connfd < 0");
-                    exit(1);
-                }
-     //           event.handle();
-                char *str = inet_ntoa(clientaddr.sin_addr);
-                std::cout << "++" << connfd << std::endl;
-                // 设置用于读操作的文件描述符
-                ev.data.fd = connfd;
-                // 设置用于注册的读操作事件
-                ev.events = EPOLLIN | EPOLLET |EPOLLOUT;
-                // 注册ev
-                epoll_ctl(epfd, EPOLL_CTL_ADD, connfd, &ev);
-            } else if (events[i].events & EPOLLIN) {
-                std::cout << "EPOLLIN" << std::endl;
-                if ((sockfd = events[i].data.fd) <0 )
-                    continue;
-                if ((n = read(sockfd, line, MAXLINE)) < 0) {
-                    if (errno == ECONNRESET) {
-                        close(sockfd);
-                        events[i].data.fd = -1;
-                    } else
-                        std::cout << "readline error " << std::endl;
-                } else if (n == 0) {
-                    // close(sockfd);
-                    events[i].data.fd = -1;
-                }
-                line[n] = '\0';
-                //std::cout << "read " << line << std::endl;
-            } else if (events[i].events & EPOLLOUT) {
-                sockfd = events[i].data.fd;
-                //write(sockfd, line, n);
-            } else {
-                std::cout << "unknown state" << events[i].data.fd << std::endl;
-            }
-        }
-    }
-    // t.join();
     return 0;
 }
