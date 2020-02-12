@@ -6,7 +6,7 @@ lib/
 *.sh
 Makefile
 CMakeFiles/
-Build/
+build/
 CMakeCache.txt
 CMakeLists.txt
 *.cmake
