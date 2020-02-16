@@ -29,7 +29,7 @@ private:
 
 Event::Event(int fd) : sockfd(fd)
 {
-    setNonBlock();
+    // setNonBlock();
 }
 void Event::setNonBlock()
 {
@@ -50,20 +50,21 @@ void Event::setNonBlock()
 
 void Event::handle()
 {
-    printf("hello,this is %d talking.\n", sockfd);
+    // printf("hello,this is %d talking.\n", sockfd);
 }
 
 class Acceptor : public Event
 {
 public:
-    explicit Acceptor(int fd, int listenLimit_, std::shared_ptr<ThreadSafeQueue<Event>> th);
+    explicit Acceptor(int fd, int listenLimit_, std::shared_ptr<ThreadSafeQueue<int>> th);
     void handle() override;
     void init(std::string address, int listen_port);
     ~Acceptor() override;
 
 private:
     int listenLimit;
-    std::shared_ptr<ThreadSafeQueue<Event> > events_queue;
+    std::shared_ptr<ThreadSafeQueue<int> > events_queue;
+    struct sockaddr_in serv_addr;
 };
 
 

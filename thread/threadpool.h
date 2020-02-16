@@ -13,7 +13,7 @@
 class ThreadPool {
 
 public:
-    ThreadPool(size_t count);
+    ThreadPool(size_t threads);
     template<class F, class... Args>
     auto enqueue(F&& f, Args&&... args) -> std::future<class std::result_of<F(Args...)>::type>;//event enqueue
     ~ThreadPool();
@@ -30,6 +30,7 @@ private:
 inline ThreadPool::ThreadPool(size_t threads)
     : stop(false)
 {
+    std::cout << "create threadpool" << std::endl;
     for(size_t i = 0; i < threads; ++i)
     {
         workers.emplace_back([this]{
@@ -47,7 +48,7 @@ inline ThreadPool::ThreadPool(size_t threads)
                 task();
             }
         });
-    std::cout << __LINE__ << std::endl;
+    std::cout << __func__ << __LINE__ << std::endl;
     }
 }
 
@@ -56,7 +57,6 @@ template<class F, class... Args>
 auto ThreadPool::enqueue(F&& f, Args&&... args)
     -> std::future<class std::result_of<F(Args...)>::type>
 {
-    std::cout << __LINE__ << std::endl;
     using return_type = typename std::result_of<F(Args...)>::type;
 
     auto task = std::make_shared<std::packaged_task<return_type()>>(

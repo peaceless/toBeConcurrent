@@ -27,12 +27,12 @@ Client::Client(std::string server_ip)
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = inet_addr(ip);
-    serv_addr.sin_port = htons(8000);
+    serv_addr.sin_port = htons(8080);
 }
 
 void Client::operator()()
 {
-    while (std::cin.get() != '\n')
+    while (1)
     {
         int sock;
         if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -45,11 +45,12 @@ void Client::operator()()
         {
             std::cout << "Can't connect!" << std::endl;
             std::cout << "errno is " << errno << std::endl;
-            exit(0);
+             exit(0);
         }
         else
         {
             std::cout << sock << "++" << std::endl;
+            write(sock, "hello", 5);
             sleep(1);
             close(sock);
             std::cout << sock << "--" << std::endl;
