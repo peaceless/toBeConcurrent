@@ -1,9 +1,7 @@
-// handle a epoll queue
-// deliver event to thread
-// get event from acceptor
 #ifndef LOOPEVENT_H_
 #define LOOPEVENT_H_
 #include <vector>
+#include <mutex>
 #include "../event/event.h"
 #include "../thread/threadpool.h"
 #include <sys/epoll.h>
@@ -12,6 +10,11 @@ class loopEvent : public Event{
 public:
     loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool* tp);
     void operator()();
+    void addErrorEvent(int fd);
+
+private:
+    void cleanErrorEvent();
+    void removeEvent(int event_id);
 
 private:
     enum  {LIMIT = 500};
@@ -20,53 +23,128 @@ private:
     epoll_event events[LIMIT], event;
     std::shared_ptr<ThreadSafeQueue<int> > fd_queue;
     std::vector<Event> events_queue;
+    // ThreadSafeQueue<int> error_queue;
+    std::queue<int> error_queue;
+
+    // std::mutex mut;
+
 };
+
+//class pEvent : public Event
+//{
+//public:
+//    void setNonBlock();
+//    void handle() override;
+//    pEvent(int fd, const loopEvent* le_);
+//
+//private:
+//    loopEvent* le;
+//};
 
 loopEvent::loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool* tp)
     : epfd(fd), fd_queue(th), Event(fd), pool(tp)
 {
-    events_queue.reserve(LIMIT);
+    events_queue.emplace_back(Event(0));
+    for (int i = 1; i < LIMIT; i++) {
+        events_queue.emplace_back(Event(-1));
+    }
 }
+void loopEvent::addErrorEvent(int fd)
+{
+    // std::lock_guard<std::mutex> lk(mut);
+    error_queue.push(fd);
+}
+
 #define LIMIT_PER_TIME 10
 void loopEvent::operator()()
 {
     epfd = epoll_create(500);
     while(1) {
-        for (int i = 0; i < LIMIT_PER_TIME && fd_queue->size(); i++)
+        for (int i = 0; i < LIMIT_PER_TIME && !fd_queue->IsEmpty(); i++)
         {
             std::shared_ptr<int> event_fd = fd_queue->TryPop();
-            std::cout << "event_fd is " << *event_fd << std::endl;
+
             event.data.fd = *event_fd;
             event.events = EPOLLIN | EPOLLET;
             if (epoll_ctl(epfd, EPOLL_CTL_ADD, *event_fd, &event) == -1)
                 std::cout << __func__ << " error: add event into epoll wrong!" << *event_fd << std::endl;
-            events_queue.emplace_back(Event(*event_fd));
+
+            events_queue[*event_fd] = Event(*event_fd);
+            events_queue[*event_fd].setNonBlock();
+            events_queue[0].sockfd ++;
         }
-        int eventCount = epoll_wait(epfd, events, 500, 500);
+
+        int eventCount = epoll_wait(epfd, events, LIMIT, LIMIT);
+
         for(int i = 0; i < eventCount; ++i) {
-            std::cout << eventCount << "events occured." << std::endl;
-            if(events[i].events == EPOLLERR)
+            std::cout << eventCount << "events occured." << events[i].events << std::endl;
+            if(events[i].events == (EPOLLERR | EPOLLHUP) )
             {
-                std::cout << events[i].data.fd << "closed." << std::endl;
-                close(events[i].data.fd);
-            } else {
+
+                // removeEvent(events[i].data.fd);
+                std::cout << "remove." << EPOLLERR << std::endl;
+
+            } else if (events[i].events == EPOLLIN){
                 pool->enqueue(&Event::handle, events_queue[events[i].data.fd]);
+
+                // reset events
+                event.data.fd = events[i].data.fd;
+                epoll_ctl(epfd, EPOLL_CTL_MOD, events[i].data.fd, &event);
             }
         }
+        cleanErrorEvent();
     }
 }
 
-bool swap(int i, std::vector<Event> vector, int std)
+void loopEvent::cleanErrorEvent()
 {
-    for (int t = vector.size(); t > 0; t--)
-    {
-        if (vector[t].sockfd != std)
-        {
-            Event temp = vector[t];
-            vector[t] = vector[i];
-            vector[i] = temp;
-        }
+    // std::lock_guard<std::mutex> lk(mut);
+    int t = error_queue.size();
+    for(int i = 0; i < LIMIT && i < t; i++) {
+        int p = error_queue.back();
+        error_queue.pop();
+        removeEvent(p);
     }
-    return true;
 }
+
+void loopEvent::removeEvent(int event_id)
+{
+    event.data.fd = events_queue[event_id].sockfd;
+    events_queue[event_id].sockfd = -1;
+    epoll_ctl(epfd, EPOLL_CTL_DEL, event_id, &event);
+    close(event_id);
+    events_queue[0].sockfd --;
+}
+
+
+
+//pEvent::pEvent(int fd, const loopEvent* le_)
+//    : Event(fd), le(const_cast<loopEvent*>(le_))
+//{}
+//
+//void pEvent::handle()
+//{
+//    char buffer[100] = "\0";
+//    if (!recv(sockfd, buffer, 100, 0))
+//    {
+//        le->addErrorEvent(sockfd);
+//    }
+//}
+//
+//void pEvent::setNonBlock()
+//{
+//    int opts;
+//    opts = fcntl(sockfd, F_GETFL);
+//    if (opts < 0)
+//    {
+//        perror("fcntl(sock, GETFL)");
+//        return;
+//    }
+//    opts = opts | O_NONBLOCK;
+//    if (fcntl(sockfd, F_SETFL, opts) < 0)
+//    {
+//        perror("fcntl(sock, SETFL, opts)");
+//        return;
+//    }
+//}
 #endif

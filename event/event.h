@@ -23,7 +23,6 @@ public:
 public:
     int sockfd;
 
-private:
     void setNonBlock();
 };
 
@@ -50,7 +49,10 @@ void Event::setNonBlock()
 
 void Event::handle()
 {
-    // printf("hello,this is %d talking.\n", sockfd);
+    //char t[100] = "\0";
+    //if (!recv(sockfd, t, 100, 0))
+    //{
+    //}
 }
 
 class Acceptor : public Event

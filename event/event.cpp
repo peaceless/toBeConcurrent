@@ -31,12 +31,10 @@ void Acceptor::handle()
     clntAddrSize = sizeof(clntAddr);
     bzero(&clntAddr, clntAddrSize);
     int clientSocketFd;
-    // std::cout << sockfd << "ready to connected..." << std::endl;
+
     while ((clientSocketFd
         = accept(sockfd, reinterpret_cast<struct sockaddr *>(&clntAddr), &clntAddrSize)) > 0) {
-            // std::cout << __func__ << __LINE__ << std::endl;
             events_queue->push(clientSocketFd);
-            std::cout << "clientSocketFd ++" << std::endl;
         }
     std::cout << __func__ << clientSocketFd << "end." << std::endl;
     system("pause");
