@@ -1,7 +1,7 @@
 #ifndef LOOPEVENT_H_
 #define LOOPEVENT_H_
 #include <vector>
-#include <mutex>
+#include <memory>
 #include "../event/event.h"
 #include "../thread/threadpool.h"
 #include <sys/epoll.h>
@@ -11,6 +11,7 @@ public:
     loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool* tp);
     void operator()();
     void addErrorEvent(int fd);
+    void handle() override;
 
 private:
     void cleanErrorEvent();
@@ -26,7 +27,7 @@ private:
     // ThreadSafeQueue<int> error_queue;
     std::queue<int> error_queue;
 
-    // std::mutex mut;
+    std::mutex mut;
 
 };
 
@@ -51,12 +52,13 @@ loopEvent::loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPoo
 }
 void loopEvent::addErrorEvent(int fd)
 {
-    // std::lock_guard<std::mutex> lk(mut);
+    std::lock_guard<std::mutex> lk(mut);
+    std::cout << __func__ << fd << "...." << std::endl;
     error_queue.push(fd);
 }
 
 #define LIMIT_PER_TIME 10
-void loopEvent::operator()()
+void loopEvent::handle()
 {
     epfd = epoll_create(500);
     while(1) {
@@ -81,8 +83,8 @@ void loopEvent::operator()()
             if(events[i].events == (EPOLLERR | EPOLLHUP) )
             {
 
-                // removeEvent(events[i].data.fd);
-                std::cout << "remove." << EPOLLERR << std::endl;
+                addErrorEvent(events[i].data.fd);
+                std::cout << "add errorEvent " << events[i].data.fd << std::endl;
 
             } else if (events[i].events == EPOLLIN){
                 pool->enqueue(&Event::handle, events_queue[events[i].data.fd]);
@@ -98,7 +100,7 @@ void loopEvent::operator()()
 
 void loopEvent::cleanErrorEvent()
 {
-    // std::lock_guard<std::mutex> lk(mut);
+    std::lock_guard<std::mutex> lk(mut);
     int t = error_queue.size();
     for(int i = 0; i < LIMIT && i < t; i++) {
         int p = error_queue.back();
