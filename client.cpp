@@ -45,13 +45,14 @@ void Client::operator()()
         {
             std::cout << "Can't connect!" << std::endl;
             std::cout << "errno is " << errno << std::endl;
-             exit(0);
+            break;
+            //  exit(0);
         }
         else
         {
             std::cout << sock << "++" << std::endl;
-            write(sock, "hello", 5);
-            sleep(1);
+            write(sock, ".", 1);
+            sleep(2);
             close(sock);
             std::cout << sock << "--" << std::endl;
         }
@@ -61,5 +62,12 @@ void Client::operator()()
 int main()
 {
     Client my_client;
-    my_client();
+    std::vector<std::thread> vect;
+    for(int i = 0; i < 10; i++)
+    {
+        vect.emplace_back(my_client);
+    }
+    // my_client();
+    for(int i = 0; i < 10; i++)
+        vect[i].join();
 }

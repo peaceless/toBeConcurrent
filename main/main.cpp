@@ -32,7 +32,7 @@ int main(int argc, char* argv[])
 
     int epfd = 0;//epoll_create(500);
     loopEvent le(epfd, th, tp);
-    std::thread t1(le);
+    std::thread t1(&loopEvent::handle, &le);
     t1.join();
     t2.join();
 
