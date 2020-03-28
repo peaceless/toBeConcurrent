@@ -8,7 +8,7 @@
 #include <mutex>
 #include <queue>
 #include <memory>
-// TODO: make a threadsafe structure on your own
+
 template<class T, class Container = std::queue<T>>
 class ThreadSafeQueue
 {
@@ -17,14 +17,12 @@ public:
 
     int size()
     {
-        // std::cout << __func__ << std::endl;
         std::lock_guard<std::mutex> lock(mutex_);
         return queue_.size();
     }
     template <class Element>
     void push(Element&& element)
     {
-        // std::cout << __func__ << std::endl;
         std::lock_guard<std::mutex> lock(mutex_);
         queue_.push(std::forward<Element>(element));
         not_empty_cv_.notify_one();
@@ -56,7 +54,6 @@ public:
 
     bool TryPop(T& t)
     {
-        // std::cout << __func__ << std::endl;
         std::lock_guard<std::mutex> lock(mutex_);
         if (queue_.empty()) {
             return false;
@@ -69,7 +66,6 @@ public:
 
     std::shared_ptr<T> TryPop()
     {
-        // std::cout << __func__ << std::endl;
         std::lock_guard<std::mutex> lock(mutex_);
         if (queue_.empty()) {
             return std::shared_ptr<T>();

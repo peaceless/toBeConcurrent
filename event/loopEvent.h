@@ -2,6 +2,7 @@
 #define LOOPEVENT_H_
 #include <vector>
 #include <memory>
+// #include <mutex>
 #include <atomic>
 #include "../event/event.h"
 #include "../thread/threadpool.h"
@@ -49,7 +50,7 @@ private:
     ThreadPool *pool;
     epoll_event events[LIMIT], event;
     std::shared_ptr<ThreadSafeQueue<int>> fd_queue;
-    std::vector<pEvent> events_queue;
+    std::vector<pEvent *> events_queue;
     std::queue<int> error_queue;
 
     std::mutex mut;
@@ -62,6 +63,8 @@ public:
     void handle() override;
     pEvent(int fd, const loopEvent *le_);
 
+    std::mutex mut;
+    int evcount;
 private:
     loopEvent *le;
 };
@@ -69,11 +72,8 @@ private:
 loopEvent::loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool *tp)
     : epfd(fd), fd_queue(th), Event(fd), pool(tp)
 {
-    events_queue.emplace_back(pEvent(0, this));
-    for (int i = 1; i < LIMIT; i++)
-    {
-        events_queue.emplace_back(pEvent(-1, this));
-    }
+    events_queue.resize(LIMIT); // all place has a null value
+    events_queue[0] = new pEvent(0, this);
 }
 void loopEvent::addErrorEvent(int fd)
 {
@@ -84,6 +84,7 @@ void loopEvent::addErrorEvent(int fd)
 #define LIMIT_PER_TIME 10
 void loopEvent::handle()
 {
+    int max = 0;
     epfd = epoll_create(500);
     while (1)
     {
@@ -98,36 +99,43 @@ void loopEvent::handle()
             if (epoll_ctl(epfd, EPOLL_CTL_ADD, *event_fd, &event) == -1)
                 lg << __func__ << " error: add event into epoll wrong!" << *event_fd << std::endl;
 
-            if (events_queue[*event_fd].sockfd != -1)
+            if (events_queue[*event_fd] != nullptr)
             {
                 lg << "-1 error." << std::endl;
-                for (int i = 0; i < 50; i++)
-                {
-                    lg << events_queue[i].sockfd << " ";
-                }
+                lg << *event_fd << "is exit." << std::endl;
                 exit(-1);
             }
-            lg << *event_fd << " ++" << std::endl;
-            events_queue[*event_fd] = pEvent(*event_fd, this);
-            events_queue[*event_fd].setNonBlock();
-            events_queue[0].sockfd++;
+            // lg << *event_fd << " ++" << std::endl;
+            events_queue[*event_fd] = new pEvent(*event_fd, this);
+            events_queue[*event_fd]->setNonBlock();
+            events_queue[0]->sockfd++;
+
+            if(max < *event_fd) max = *event_fd;
         }
+        lg << "max is " << max << std::endl;
 
         int eventCount = epoll_wait(epfd, events, LIMIT, LIMIT);
-        lg << eventCount << "events occured." << std::endl;
 
         for (int i = 0; i < eventCount; ++i)
         {
+            // XXX : epollerr & epollhup seem like only hanppen when server peer
             if (events[i].events == (EPOLLERR | EPOLLHUP))
             {
-                addErrorEvent(events[i].data.fd);
-                lg << "ADD errorEvent " << events[i].data.fd << std::endl;
-            }
-            else if (events[i].events == EPOLLIN)
+                exit(-1);
+                // addErrorEvent(events[i].data.fd);
+                // lg << "ADD errorEvent " << events[i].data.fd << std::endl;
+            } else if (events[i].events == EPOLLIN)
             {
-                // if (events_queue[events[i].data.fd].flag == true)
-                // continue;
-                pool->enqueue(&pEvent::handle, &(events_queue[events[i].data.fd]));
+                std::lock_guard<std::mutex> lk(events_queue[events[i].data.fd]->mut);
+                if (events_queue[events[i].data.fd]->evcount > 0)
+                {
+                    events_queue[events[i].data.fd]->evcount ++;
+                    lg << events_queue[events[i].data.fd]->sockfd << events_queue[events[i].data.fd]->evcount << "bigger than zero." << std::endl;
+                } else if (events_queue[events[i].data.fd]->evcount == 0) {
+                    events_queue[events[i].data.fd]->evcount ++;
+                    lg << events_queue[events[i].data.fd]->sockfd << "in." << events_queue[events[i].data.fd]->evcount << std::endl;
+                    pool->enqueue(&pEvent::handle, events_queue[events[i].data.fd]);
+                }
             }
         }
         cleanErrorEvent();
@@ -144,58 +152,93 @@ void loopEvent::cleanErrorEvent()
         error_queue.pop();
         removeEvent(p);
     }
-    lg << "now how many links are in queue: " << events_queue[0].sockfd << std::endl;
-    int p = 0;
-    for (int i = 1; i < 50; i++)
-        if (events_queue[i].sockfd != -1)
-            p++;
+    // lg << "now how many links are in queue: " << events_queue[0]->sockfd << std::endl;
+    // int p = 0;
+    // for (int i = 1; i < 50; i++)
+    //     if (events_queue[i] != nullptr)
+    //         p++;
 
-    if (events_queue[0].sockfd != p)
-    {
-        lg << "error :" << events_queue[0].sockfd << " " << p << std::endl;
-        for (int i = 0; i < 50; i++)
-        {
-            lg << events_queue[i].sockfd << " ";
-        }
-        lg << "\n"
-           << std::endl;
-        exit(-1);
-    }
+    // if (events_queue[0]->sockfd != p)
+    // {
+    //     lg << "error :" << events_queue[0]->sockfd << " " << p << std::endl;
+    //     for (int i = 0; i < 50; i++)
+    //     {
+    //         lg << events_queue[i]->sockfd << " ";
+    //     }
+    //     lg << "\n" << std::endl;
+    //     exit(-1);
+    // }
 }
 
 void loopEvent::removeEvent(int event_id)
 {
-    event.data.fd = events_queue[event_id].sockfd;
-    events_queue[event_id].sockfd = -1;
+    if (events_queue[event_id] == nullptr)
+        return;
+    // wait for all thread has handle over this sock
+    while (events_queue[event_id]->evcount > 0)
+        std::this_thread::yield;
+    lg << "delete " << event_id << std::endl;
+    event.data.fd = events_queue[event_id]->sockfd;
+    delete events_queue[event_id];
+    events_queue[event_id] = nullptr;
+
     if (epoll_ctl(epfd, EPOLL_CTL_DEL, event_id, &event))
     {
         lg << "...................delete error" << errno << std::endl;
+        exit(-1);
     }
+    shutdown(event_id, SHUT_RDWR);
     close(event_id);
-    events_queue[0].sockfd--;
-    lg << "delete " << event_id << std::endl;
+    events_queue[0]->sockfd--;
 }
 
 pEvent::pEvent(int fd, const loopEvent *le_)
-    : Event(fd), le(const_cast<loopEvent *>(le_))
+    : Event(fd), le(const_cast<loopEvent *>(le_)), evcount(0)
 {
 }
 
 void pEvent::handle()
 {
     char buffer[100] = "\0";
-    while (1)
+    bool flag = false;
+    // while (evcount > 0)
+    for (;;)
     {
         int i = recv(sockfd, buffer, 100, 0);
         if (i > 0) {
-            lg << buffer << std::endl;
-        }
-        if (i == -1 && errno == EWOULDBLOCK)
-            break;
-        else if (i == 0)
+            // specify how to deal event
+        } else if (i == -1 && errno == EWOULDBLOCK) // read all data from buffer
         {
+            std::lock_guard<std::mutex> lk(mut);
+            evcount --;
+            lg << evcount << " "<< sockfd << std::this_thread::get_id() << std::endl;
+            if (!evcount)
+                break;
+            if (evcount < 0)
+            {
+                lg << "count of handle has negitive" << std::endl;
+                exit(-1);
+            }
+        } else if (i == 0)    // client side has closed connection
+        {
+            std::lock_guard<std::mutex> lk(mut);
+            evcount = -2;   // handle over
             le->addErrorEvent(sockfd);
             break;
+            // evcount --;
+            // lg << evcount << "==" << sockfd << std::this_thread::get_id() << std::endl;
+            // if (!flag)
+            // {
+            //     le->addErrorEvent(sockfd);
+            //     flag = true;
+            // }
+            // if (!evcount)
+            //     break;
+            // if (evcount < 0)
+            // {
+            //     lg << "wrong" << std::endl;
+            //     exit(-1);
+            // }
         }
     }
 }
