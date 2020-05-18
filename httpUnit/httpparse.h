@@ -22,12 +22,12 @@ public:
     HttpParse();
     ~HttpParse();
 
-    void ParseData(const char *msg);
+    int8_t ParseData(const char *msg);
     HttpRequest &GetResult();
     bool ParseRequestLine(std::string &requestLineData);
     bool ParseURL();
-    uint8_t ParseHeaders(std::string &headerData);
-    bool ParseBody(std::string &bodyData);
+    int8_t ParseHeaders(std::string &headerData);
+    int8_t ParseBody(std::string &bodyData);
 
 private:
 
@@ -40,7 +40,8 @@ private:
         requestLine,
         headers,
         body,
-        error
+        error,
+        end
     }status;
     struct HttpRequest httpRequest;
 };

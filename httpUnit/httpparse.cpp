@@ -1,95 +1,148 @@
 // parse http
 #include "httpparse.h"
 #include <iostream>
+#include <vector>
+#include <fstream>
 HttpParse::HttpParse()
 {
     status = requestLine;
 }
 HttpParse::~HttpParse()
-{}
-void HttpParse::ParseData(const char *msg)
+{
+}
+int8_t HttpParse::ParseData(const char *msg)
 {
     // if has data has not parsed
     // combine the new data reached and the left data
     // find a \n from data has read
-    std::cout << "msg is \n" << msg << "\\";
-    std::cout << "\n---------\n" << std::endl;
+    // std::cout << "msg is \n" << msg << "\\";
+    // std::cout << "\n---------\n" << std::endl;
+    if (status == end)
+    {
+        status = requestLine;
+        httpRequest.headers.clear();
+        httpRequest.GET_Args.clear();
+        httpRequest.POST_Args.clear();
+        httpRequest.method = "";
+        httpRequest.url = "";
+        httpRequest.version = "";
+        httpRequest.isCGI = false;
+    }
     Data += msg;
     std::string temp;
     std::string::size_type pos = 0, breakPoint = 0;
-    std::string::iterator begin,cr, lf;
+    std::string::iterator begin, cr, lf;
     begin = Data.begin();
-    while ((pos = Data.find_first_of('\n', pos)) != std::string::npos) {
-        lf = begin + pos + 1;
-        cr = lf - 2;
-        // std::cout << *cr << *lf << int('\n')<< std::endl;
-        // std::cout << int(*cr) << int(*lf) << std::endl;
-        if (!CheckCRLF(cr, lf)) {
-            std::cout << "get true" << std::endl;
-            return ;
-        }
-        temp = Data.substr(breakPoint, pos + 1);
-        pos ++;
-        breakPoint = pos;
-        std::cout << pos << "is here" << std::endl;
-        switch(status) {
-            case requestLine: {
-                if (ParseRequestLine(temp)) {
+    if (status != body)
+        while ((pos = Data.find_first_of('\n', pos)) != std::string::npos)
+        {
+            lf = begin + pos + 1;
+            cr = lf - 2;
+            if (!CheckCRLF(cr, lf))
+            {
+                std::cout << "unexcepted character." << std::endl;
+                return false;
+            }
+            temp = Data.substr(breakPoint, pos - breakPoint - 1);
+            pos++;
+            breakPoint = pos;
+            switch (status)
+            {
+            case requestLine:
+            {
+                if (ParseRequestLine(temp))
+                {
                     status = headers;
-                } else status = error;
+                }
+                else
+                    status = error;
+                break;
             }
-            case headers: {
-                uint8_t  ret = ParseHeaders(temp);
-                if (ret == 0) {
+            case headers:
+            {
+                uint8_t ret = ParseHeaders(temp);
+                if (ret == 0)
+                {
                     status = body;
-                } else if (ret == -1) status = error;
+                    goto body_place;
+                }
+                else if (ret == -1)
+                    status = error;
+                break;
             }
-            case body: {
-                if (ParseBody(temp)) {
+                // case body: {
+                //     std::cout << "body parsehello." << std::endl;
+                //     if (ParseBody(temp)) {
 
-                } else status = error;
+                //     } else status = error;
+                //     break;
+                // }
             }
         }
+body_place:    Data.erase(0, breakPoint);
+    if (status == body)
+    {
+        std::cout << "body parse." << std::endl;
+        int8_t result = ParseBody(Data);
+        if (result == 1)
+        {
+            status = end;
+            return true;
+        }
+        else if(result == 0)
+            status = error;
     }
-    Data.erase(0, breakPoint);
-    std::cout << Data << std::endl;
-    std::cout << "\n--------\n" << std::endl;
+    std::cout << "\nafter erase, data is\n:" << Data << std::endl;
+    if (status == error)
+        return false;
+    return -1;
 }
 
 bool HttpParse::ParseRequestLine(std::string &data)
 {
     const char *msg = data.data();
     bool flag = false;
-    enum {method,
-            url,
-            version}status;
+    enum
+    {
+        method,
+        url,
+        version
+    } status;
     status = method;
     const char *pos = nullptr;
     while ((pos = strchr(msg, ' ')) != nullptr)
     {
-        if (*msg == ' ') {
-            msg ++;
+        if (*msg == ' ')
+        {
+            msg++;
             continue;
         }
-        switch(status) {
-        case method :
-            if (strncmp(msg, "GET", 3))
+        switch (status)
+        {
+        case method:
+            if (!(strncmp(msg, "GET", 3) || strncmp(msg, "POST", 4))) {
                 return false;
+            }
             httpRequest.method.append(msg, (pos - msg));
-            status = url; break;
-        case url :
+            status = url;
+            break;
+        case url:
             httpRequest.url.append(msg, (pos - msg));
             status = version;
-        case version :
-            if (!strncmp(pos + 1, "HTTP", 4)) {
+        case version:
+            if (!strncmp(pos + 1, "HTTP", 4))
+            {
                 int i = 0;
                 const char *versionNumber = strchr(pos, '/');
                 versionNumber++;
                 pos = versionNumber;
-                for (; *pos != '\r'; pos++, i++);
+                for (; *pos != '\0'; pos++, i++)
+                    ;
                 httpRequest.version.append(versionNumber, i);
                 return ParseURL();
-            } else return false;
+            }
+            else
+                return false;
         }
         pos += 1;
         msg = pos;
@@ -101,30 +154,40 @@ bool HttpParse::ParseURL()
 {
     std::string &url = httpRequest.url;
     std::string::size_type args_start_pos = url.find_first_of('?');
-    if (args_start_pos == std::string::npos) {
+    if (args_start_pos == std::string::npos)
+    {
         httpRequest.isCGI = CheckCGI(url);
-    } else {
+    }
+    else
+    {
         std::string args = url.substr(args_start_pos + 1);
         url = url.substr(0, args_start_pos);
         httpRequest.isCGI = CheckCGI(url);
 
         std::string::size_type pos = args.find('&');
-        while (pos != std::string::npos) {
+        while (pos != std::string::npos)
+        {
             std::string argument = args.substr(0, pos);
             args = args.substr(pos + 1);
 
             std::string::size_type p = argument.find('=');
-            if (p == std::string::npos) {
+            if (p == std::string::npos)
+            {
                 return false;
-            } else {
-                httpRequest.GET_Args[argument.substr(0, p)] = argument.substr(p+1);
+            }
+            else
+            {
+                httpRequest.GET_Args[argument.substr(0, p)] = argument.substr(p + 1);
             }
             pos = args.find('&');
         }
         auto p = args.find('=');
-        if (p == std::string::npos) {
+        if (p == std::string::npos)
+        {
             return false;
-        } else {
+        }
+        else
+        {
             httpRequest.GET_Args[args.substr(0, p)] = args.substr(p + 1);
         }
     }
@@ -138,54 +201,78 @@ bool HttpParse::CheckCGI(const std::string &url)
     return type == "php";
 }
 
-uint8_t HttpParse::ParseHeaders(std::string &data)
+int8_t HttpParse::ParseHeaders(std::string &data)
 {
     std::string::iterator head = data.begin();
     std::string::iterator end = data.end();
     std::string::iterator pos = head;
 
-    std::cout << data << std::endl;
-    if (CheckCRLF(head, end))
+    if (data.size() == 0)
+    {
+        std::cout << "header is end." << std::endl;
         return 0;
+    }
     std::string header_field, header_value;
-    enum {field, colon, value, next, h_end, error} status;
+    enum
+    {
+        field,
+        colon,
+        value,
+        next,
+        h_end,
+        error
+    } status;
     status = field;
-    while(pos != (end - 2) && status != error) {
-        switch(status) {
-            case field: {
-                if (!(*pos == ' ' || *pos == ':')) {
-                    break;
-                }
-                header_field.append(head, pos);
-                status = colon;
-            }
-            case colon: {
-                if (*pos == ' ' || *pos == ':') {
-                    break;
-                }
-                head = pos;
-                status = value;
-            }
-            case value: {
-                if (*pos != '\r') {
-                    break;
-                }
-                header_value.append(head, pos);
-                httpRequest.headers[header_field] = header_value;
-                header_field.clear();
-                header_value.clear();
-                status = next;
-            }
-            case next: {
-                // if (CheckCRLF(pos, end)) {
-                //     pos ++;
-                // } else status = error;
+    while (pos != end && status != error)
+    {
+        switch (status)
+        {
+        case field:
+        {
+            if (!(*pos == ' ' || *pos == ':'))
+            {
                 break;
             }
+            header_field.append(head, pos);
+            status = colon;
+            break;
         }
-        pos ++;
+        case colon:
+        {
+            if (*pos == ' ' || *pos == ':')
+            {
+                break;
+            }
+            head = pos;
+            pos--;
+            status = value;
+            break;
+        }
+        // TODO: without \r\n,put value into map
+        case value:
+        {
+            if (end - pos > 1)
+            {
+                break;
+            }
+            header_value.append(head, pos + 1);
+            httpRequest.headers[header_field] = header_value;
+            header_field.clear();
+            header_value.clear();
+            // status = next;
+            break;
+        }
+            // case next: {
+            //     // if (CheckCRLF(pos, end)) {
+            //     //     pos ++;
+            //     // } else status = error;
+            //     break;
+            // }
+        }
+        pos++;
     }
-    if (status == error) {
+    if (status == error)
+    {
         return -1;
     }
     return 1;
@@ -195,142 +282,171 @@ bool HttpParse::CheckCRLF(std::string::iterator &start, std::string::iterator &e
 {
     if (!((end - start) > 1))
         return false;
-    if(*start == '\r' && *(start + 1) == '\n') {
-        start ++;
+    if (*start == '\r' && *(start + 1) == '\n')
+    {
+        start++;
         return true;
     }
     return false;
 }
 
-bool HttpParse::ParseBody(std::string &body)
+void ParseFormData(std::string &body)
+{
+
+}
+// zero for false, one for over, -1 for data not enough
+int8_t HttpParse::ParseBody(std::string &body)
 {
     // std::unordered_map<std::string, std::string>::iterator
-    auto content_type_data_iterator = httpRequest.headers.find("Content-Type");//["Content-Type"];
-    if (content_type_data_iterator == httpRequest.headers.end())
-        return true;
+    bool isGET = false;
+    if (httpRequest.method == "GET")
+        isGET = true;
+    auto content_type_data_iterator = httpRequest.headers.find("Content-Type");
+    if (content_type_data_iterator == httpRequest.headers.end()) {
+        if (!isGET)
+            return 0;
+    }
+    auto content_data_len_iterator = httpRequest.headers.find("Content-Length");
+    if (content_data_len_iterator == httpRequest.headers.end())
+        return 0;
+    auto len = stoi(content_data_len_iterator->second);
+    if (body.size() < len)
+        return -1;
+    std::cout << "with now body is:\n" << body << std::endl;
+    auto data = body.substr(0, len);
+    body = body.substr(len);
     std::string content_type_data = content_type_data_iterator->second;
     size_t w;
-    for ( w = 0; w < content_type_data.size(); w++) {
+    for (w = 0; w < content_type_data.size(); w++)
+    {
         if (content_type_data[w] == ' ' || content_type_data[w] == ';')
             break;
     }
     std::string type = content_type_data.substr(0, w);
 
-    if (type == "application/x-www-form-urlencoded") {
-        std::string &args = body;
+    if (type == "application/x-www-form-urlencoded")
+    {
+        std::string &args = data;
         auto pos = args.find('&');
-        while(pos != std::string::npos) {
+        while (pos != std::string::npos)
+        {
             auto argument = args.substr(0, pos);
             args = args.substr(pos + 1);
 
             auto p = argument.find('=');
-            if (p == std::string::npos) {
+            if (p == std::string::npos)
+            {
                 return false;
-            } else {
-                httpRequest.POST_Args[argument.substr(0,p)] = argument.substr(p + 1);
+            }
+            else
+            {
+                httpRequest.POST_Args[argument.substr(0, p)] = argument.substr(p + 1);
             }
             pos = args.find('&');
         }
         auto p = args.find('=');
-        if (p == std::string::npos) {
+        if (p == std::string::npos)
+        {
             return false;
-        } else {
+        }
+        else
+        {
             httpRequest.POST_Args[args.substr(0, p)] = args.substr(p + 1);
         }
-    } else if (type == "multipart/form-data") {
-        // auto pos = content_type_data.find("boundary");
-        // if (pos != std::string::npos) {
-            // /*
-            //   Data Format:
-
-            //   [Boundary]\r\n
-            //   [key] : [value]\r\n
-            //   \r\n
-            //   \r\n
-            //   [Boundary]--\r\n
-
-            // */
-        //    auto boundary = content_type_data.substr(pos);
-        //    auto equal_symbol_pos = boundary.find('=');
-        //    if (equal_symbol_pos == std::string::npos)
-                // return false;
-            // boundary = boundary.substr(equal_symbol_pos + 1);
-            // size_t index = 0;
-            // for (; index < boundary.size(); index ++) {
-                // if (boundary[index] == ' ' || boundary[index] == ':') {
-                    // break;
-                // }
-            // }
-            // boundary = boundary.substr(0, index);
-
-            // split body data base on boundary
-            // std::vector<std::string> body_data;
-
-            // std::stringstream ss(body);
-            // std::string getData, tempData;
-
-            // while(std::getline(ss, tempData)) {
-                // the line is boundary
-                // if (tempData.find(boundary) != std::string::npos)
-                // {
-                    // if (!getData.empty()) {
-                        // body_data.emplace_back(getData);
-                        // getData = "";
-                    // }
-                // } else {
-                    // getData.append(tempData);
-                    // getData.append("\n");
-                // }
-            // }
-
-            // parse body data
-            // for(auto &i : body_data) {
-                // status = Header;
-                // rawHeaders = "";
-                // current_data = "";
-                // std::unordered_map<std::string, std::string> headers;
-                // auto c = i.begin();
-                // for(; c != i.end(); c++) {
-                    // Separate(*c);
-                    // if (status == HeaderEnd) {
-                        // ParseHeaders(headers);
-                        // break;
-                    // }
-                // }
-                // c++;
-                // Get Name from Conten-Disposition
-                // std::string body(c, i.end());
-                // auto data = headers["Conten-Disposition"];
-                // if (!data.empty()) {
-                    // auto name_pos = data.find("name");
-                    // if (name_pos == std::string::npos)
-                        // continue;
-                    // auto value_pos = data.find('\"',name_pos) + 1;
-                    // if (value_pos == std::string::npos)
-                        // continue;
-                    // std::string value;
-                    // size_t n = value_pos;
-                    // for (; n != std::string::npos; n++) {
-                        // if (data[n] == '\"')
-                            // break;
-                    // }
-                    // set the value
-                    // value = data.substr(value_pos, n - value_pos);
-                    // httpRequest.POST_Args[value] = body;
-                    // std::cout << "post value size:" << httpRequest.POST_Args[value].size() << std:endl;
-                    // std::cout << "body size:" << body.size();
-                    // std::fstream file("tt.ico", std::ios::binary | std::ios::out);
-                    // file.write(body.c_str(), body.size());
-                    // file.close();
-                    // std::cout << "save the file";
-                // }
-            // }
-        // } else return false;
-    } else if (type == "text/plain") {
-        httpRequest.POST_Args["data"] = body;
-        return true;
     }
-    return true;
+    else if (type == "multipart/form-data")
+    {
+        auto pos = content_type_data.find("boundary");
+        std::cout << "point 1." << std::endl;
+        if (pos != std::string::npos) {
+            /*
+              Data Format:
+
+              [Boundary]\r\n
+              [key] : [value]\r\n
+              \r\n
+              \r\n
+              [Boundary]--\r\n
+
+            */
+            //Get Boundary
+            auto boundary = content_type_data.substr(pos);
+            auto equal_symbol_pos = boundary.find('=');
+            if (equal_symbol_pos == std::string::npos) {
+                return false;
+            }
+            boundary = boundary.substr(equal_symbol_pos+1);
+            size_t index = 0;
+            for (; index < boundary.size(); index++) {
+                if (boundary[index] == ' ' || boundary[index] ==';') {
+                    break;
+                }
+            }
+            boundary = boundary.substr(0, index);
+            boundary = "--" + boundary;
+            std::string::size_type len = boundary.size();
+
+        std::cout << "point 2." << std::endl;
+            //Split Body Data Base On Boundary
+            std::string endData(boundary + "--\r\n");
+            enum {m_boundary, m_field, m_space,m_value, m_end} status;
+            status = m_boundary;
+            std::string::size_type nameStartPos;
+            std::string field;
+            while(status != m_value) {
+                pos = data.find("\r\n");
+        std::cout << "point 3." << (pos == std::string::npos)<< std::endl;
+                if (pos != std::string::npos) {
+                    std::string temp = data.substr(0, pos);
+        std::cout << temp << '\n' << boundary << std::endl;
+                    switch(status) {
+                        case m_boundary: {
+                            if(temp == boundary) {
+                                data.erase(0, pos + 2);
+                                status = m_field;
+        std::cout << "point 4." << std::endl;
+                                break;
+                            } else return 0;
+                        }
+                        case m_field: {
+                            if (temp.size() == 0) {
+                                data.erase(0, pos + 2);
+                                status = m_value;
+        std::cout << "point 5." << std::endl;
+                                break;
+                            }                    
+                            if ((pos = data.find("name")) != std::string::npos) {
+                                nameStartPos = data.find('\"', pos);
+                                if (nameStartPos != std::string::npos) {
+        std::cout << "point 6." << std::endl;
+                                    pos = data.find('\"', nameStartPos);
+                                    if (pos == std::string::npos) {
+                                        return 0;
+                                    }
+                                    field = data.substr(nameStartPos, pos);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                } else return -1;
+            }
+            pos = data.find(boundary + "--\r\n");
+            if (pos != std::string::npos) {
+                auto flag = httpRequest.POST_Args.find(field);
+                if (flag == httpRequest.POST_Args.end()) {
+                    return 0;
+                }
+                flag->second += data.substr(0, pos);
+                std::cout << "access to form data is " << flag->first << " " << flag->second << std::endl;
+            } else return -1;
+        }
+    }
+    else if (type == "text/plain")
+    {
+        httpRequest.POST_Args["data"] = data;
+    }
+    return 1;
 }
 
 HttpRequest &HttpParse::GetResult()

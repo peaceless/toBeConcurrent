@@ -12,7 +12,7 @@
 class Client
 {
 public:
-    Client(std::string server_ip = "127.0.0.1");
+    Client(std::string server_ip = "111.62.72.10");
     void operator()();
     //void connecting();
 
@@ -27,7 +27,7 @@ Client::Client(std::string server_ip)
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = inet_addr(ip);
-    serv_addr.sin_port = htons(8080);
+    serv_addr.sin_port = htons(80);
 }
 
 void Client::operator()()
@@ -50,8 +50,11 @@ void Client::operator()()
         }
         else
         {
+            char remsg[100] = "\0";
             std::cout << sock << "++" << std::endl;
-            write(sock, ".", 1);
+            write(sock, "GET /index.html HTTP/1.1\r\nHost: www.bilibili.com\r\n\r\n", 50);
+            // recv(sock, remsg, 100, 0);
+            std::cout << remsg << std::endl;
             sleep(2);
             close(sock);
             std::cout << sock << "--" << std::endl;
@@ -63,11 +66,11 @@ int main()
 {
     Client my_client;
     std::vector<std::thread> vect;
-    for(int i = 0; i < 10; i++)
+    for(int i = 0; i < 1; i++)
     {
         vect.emplace_back(my_client);
     }
     // my_client();
-    for(int i = 0; i < 10; i++)
+    for(int i = 0; i < 1; i++)
         vect[i].join();
 }
