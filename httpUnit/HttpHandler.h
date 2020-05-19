@@ -7,11 +7,10 @@ class HttpHandler
 {
 public:
     HttpHandler(int sock);
-    bool Handle (const char *buffer/*, Cache* &cache*/);
+    bool Handle (const char *buffer);
 
 private:
     int8_t ParseHttpRequest (const char *buffer);
-    bool HandleCGIRequest (const std::string& root_path);
     bool GetFile();
     bool SendResponse (int socket, bool status);
 
@@ -25,7 +24,6 @@ private:
     // std::string read_data;
     HttpParse parser;
     HttpRequest request;
-    // Cache* cache;
 };
 
 #endif

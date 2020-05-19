@@ -7,24 +7,21 @@
 #include "fast_cgi/fcgi.h"
 
 #include <iostream>
-
+#include "../event/logger.hpp"
 extern std::string SERVER_WEB_PATH;
 
 HttpHandler::HttpHandler(int sock)
 {
     socket = sock;
 }
-bool HttpHandler::Handle (const char *buffer/*, Cache* &mcache*/)
+bool HttpHandler::Handle (const char *buffer)
 {
     uint8_t status = 0;
-    // cache = mcache;
     status = ParseHttpRequest(buffer);
     if (status == 1) {
         if (request.url == "/") {
             request.url = "/index.html";
             status = GetFile();
-        // } else if (request.isCGI) {
-        //     status = HandleCGIRequest("./www");
         } else {
             status = GetFile();
         }
@@ -44,19 +41,17 @@ bool HttpHandler::GetFile()
         } else path = "./www/wlogin.html";
     }
     if (stat(path.c_str(), &buffer)) {
-        std::cout << path << ": file not exist" << std::endl;
+        LOG_ERROR(path, "file not exist");
         return false;
     }
-    std::cout << path << std::endl;
+    LOG_INFO(path);
     std::ifstream file(path, std::ios_base::binary);
     std::string data;
     while(getline(file, data)) {
         response.data += data;
-        std::cout << data;
     }
     file.close();
     return true;
-    // return cache->GetFile(request.URL, response.data);
 }
 
 int8_t HttpHandler::ParseHttpRequest (const char *buffer)
@@ -68,31 +63,6 @@ int8_t HttpHandler::ParseHttpRequest (const char *buffer)
         request = parser.GetResult();
     }
     return ret;
-}
-
-bool HttpHandler::HandleCGIRequest (const std::string& root_path)
-{
-    FastCgi fc;
-    fc.setRequestId(1);
-    fc.startConnect();
-    fc.sendStartRequestRecord();
-    fc.sendParams("SCRIPT_FILENAME", root_path + request.url);
-    fc.sendParams("REQUEST_METHOD", request.method);
-    for (auto i : request.headers) {
-        fc.sendParams(i.first, i.second);
-    }
-    for (auto i : request.GET_Args) {
-        // LOG_TRACE(i.first, ":", i.second);
-        fc.sendParams(i.first, i.second);
-    }
-    for (auto i : request.POST_Args) {
-        // LOG_TRACE(i.first, ":", i.second);
-        fc.sendParams(i.first, i.second);
-    }
-    fc.sendEndRequestRecord();
-    fc.readFromPhp();
-    response.data = fc.getHTMLData();
-    return true;
 }
 
 bool HttpHandler::SendResponse (int socket, bool status)
@@ -107,11 +77,8 @@ bool HttpHandler::SendResponse (int socket, bool status)
         + "Content-Type: text/html;charset=UTF-8\r\n"
         + "Content-Length: " + std::to_string(response.data.size()) + "\r\n\r\n"
         + response.data;
-    std::cout << "write in.\n" << std::endl;
     int ret = write(socket, m_response.c_str(), m_response.size());
-    std::cout << "over.\n" << std::endl;
     if (ret == -1) {
-        std::cout << ret << "ret is." << std::endl;
         shutdown(socket, SHUT_WR);
         return false;
     }

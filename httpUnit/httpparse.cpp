@@ -1,4 +1,5 @@
 // parse http
+#include "../event/logger.hpp"
 #include "httpparse.h"
 #include <iostream>
 #include <vector>
@@ -40,7 +41,7 @@ int8_t HttpParse::ParseData(const char *msg)
             cr = lf - 2;
             if (!CheckCRLF(cr, lf))
             {
-                std::cout << "unexcepted character." << std::endl;
+                LOG_ERROR("unexcepted character.");
                 return false;
             }
             temp = Data.substr(breakPoint, pos - breakPoint - 1);
@@ -54,8 +55,10 @@ int8_t HttpParse::ParseData(const char *msg)
                 {
                     status = headers;
                 }
-                else
+                else{
                     status = error;
+                    LOG_ERROR("RequestLine error");
+                }
                 break;
             }
             case headers:
@@ -66,8 +69,10 @@ int8_t HttpParse::ParseData(const char *msg)
                     status = body;
                     goto body_place;
                 }
-                else if (ret == -1)
+                else if (ret == -1) {
+                    LOG_ERROR("RequestLine error");
                     status = error;
+                }
                 break;
             }
                 // case body: {
@@ -82,7 +87,6 @@ int8_t HttpParse::ParseData(const char *msg)
 body_place:    Data.erase(0, breakPoint);
     if (status == body)
     {
-        std::cout << "body parse." << std::endl;
         int8_t result = ParseBody(Data);
         if (result == 1)
         {
@@ -92,9 +96,10 @@ body_place:    Data.erase(0, breakPoint);
         else if(result == 0)
             status = error;
     }
-    std::cout << "\nafter erase, data is\n:" << Data << std::endl;
-    if (status == error)
+    if (status == error) {
+        LOG_ERROR("parse data wrong.");
         return false;
+    }
     return -1;
 }
 
@@ -209,7 +214,7 @@ int8_t HttpParse::ParseHeaders(std::string &data)
 
     if (data.size() == 0)
     {
-        std::cout << "header is end." << std::endl;
+        LOG_INFO("parse header is end.");
         return 0;
     }
     std::string header_field, header_value;
@@ -312,7 +317,6 @@ int8_t HttpParse::ParseBody(std::string &body)
     auto len = stoi(content_data_len_iterator->second);
     if (body.size() < len)
         return -1;
-    std::cout << "with now body is:\n" << body << std::endl;
     auto data = body.substr(0, len);
     body = body.substr(len);
     std::string content_type_data = content_type_data_iterator->second;
@@ -357,15 +361,14 @@ int8_t HttpParse::ParseBody(std::string &body)
     else if (type == "multipart/form-data")
     {
         auto pos = content_type_data.find("boundary");
-        std::cout << "point 1." << std::endl;
         if (pos != std::string::npos) {
             /*
               Data Format:
 
               [Boundary]\r\n
-              [key] : [value]\r\n
+              [name]="name"\r\n
               \r\n
-              \r\n
+              value
               [Boundary]--\r\n
 
             */
@@ -386,60 +389,66 @@ int8_t HttpParse::ParseBody(std::string &body)
             boundary = "--" + boundary;
             std::string::size_type len = boundary.size();
 
-        std::cout << "point 2." << std::endl;
             //Split Body Data Base On Boundary
             std::string endData(boundary + "--\r\n");
-            enum {m_boundary, m_field, m_space,m_value, m_end} status;
+            enum {m_boundary, m_field, m_space,m_value, m_end, m_error} status;
             status = m_boundary;
             std::string::size_type nameStartPos;
             std::string field;
-            while(status != m_value) {
+            while(status != m_error) {
                 pos = data.find("\r\n");
-        std::cout << "point 3." << (pos == std::string::npos)<< std::endl;
                 if (pos != std::string::npos) {
                     std::string temp = data.substr(0, pos);
-        std::cout << temp << '\n' << boundary << std::endl;
+                    data = data.substr(pos + 2);
                     switch(status) {
                         case m_boundary: {
                             if(temp == boundary) {
-                                data.erase(0, pos + 2);
-                                status = m_field;
-        std::cout << "point 4." << std::endl;
+boundary:                                status = m_field;
                                 break;
                             } else return 0;
                         }
                         case m_field: {
                             if (temp.size() == 0) {
-                                data.erase(0, pos + 2);
                                 status = m_value;
-        std::cout << "point 5." << std::endl;
                                 break;
                             }                    
-                            if ((pos = data.find("name")) != std::string::npos) {
-                                nameStartPos = data.find('\"', pos);
+                            if ((pos = temp.find("name")) != std::string::npos) {
+                                nameStartPos = temp.find('\"', pos);
                                 if (nameStartPos != std::string::npos) {
-        std::cout << "point 6." << std::endl;
-                                    pos = data.find('\"', nameStartPos);
+                                    nameStartPos ++;
+                                    pos = temp.find('\"', nameStartPos);
                                     if (pos == std::string::npos) {
+                                        LOG_ERROR("no namein");
                                         return 0;
                                     }
-                                    field = data.substr(nameStartPos, pos);
+                                    field = temp.substr(nameStartPos, pos - nameStartPos);
                                 }
                             }
                             break;
                         }
+                        case m_value: {
+                            httpRequest.POST_Args[field] += temp;
+                            status = m_end;
+                            break;
+                        }
+                        case m_end: {
+                            if (temp == boundary + "--") {
+                                return 1;
+                            }
+                            if (temp == boundary) {
+                                goto boundary;
+                            }
+                            break;
+                        }
                     }
-                } else return -1;
+                } else status = m_error;
             }
-            pos = data.find(boundary + "--\r\n");
-            if (pos != std::string::npos) {
-                auto flag = httpRequest.POST_Args.find(field);
-                if (flag == httpRequest.POST_Args.end()) {
-                    return 0;
-                }
-                flag->second += data.substr(0, pos);
-                std::cout << "access to form data is " << flag->first << " " << flag->second << std::endl;
-            } else return -1;
+            return -1;
+            // pos = data.find(boundary + "--\r\n");
+            // if (pos != std::string::npos) {
+            //     httpRequest.POST_Args[field] += data.substr(0, pos);
+            //     std::cout << httpRequest.POST_Args[field] << std::endl;
+            // } else return -1;
         }
     }
     else if (type == "text/plain")
