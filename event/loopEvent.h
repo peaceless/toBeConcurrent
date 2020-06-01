@@ -170,7 +170,7 @@ void pEvent::handle()
     {
         bzero(buffer, 100);
         int i = recv(sockfd, buffer, 100, 0);
-        std::cout << buffer << std::endl;
+        // std::cout << buffer << std::endl;
         if (i > 0) {
             handler.Handle(buffer);
             // httpParse.ParseData(buffer);
