@@ -1,0 +1,4 @@
+/home/peaceless/code/webServer/build/CMakeFiles/rebuild_cache.dir
+/home/peaceless/code/webServer/build/CMakeFiles/edit_cache.dir
+/home/peaceless/code/webServer/build/CMakeFiles/eventLib.dir
+/home/peaceless/code/webServer/build/CMakeFiles/WebServer.dir

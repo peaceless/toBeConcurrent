@@ -1,0 +1,97 @@
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: {CMAKE_CXX_FLAGS};-g
+Id flags:  
+
+The output was:
+1
+c++: error: {CMAKE_CXX_FLAGS}: 没有那个文件或目录
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: {CMAKE_CXX_FLAGS};-g
+Id flags: -c 
+
+The output was:
+1
+c++: error: {CMAKE_CXX_FLAGS}: 没有那个文件或目录
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: {CMAKE_CXX_FLAGS};-g
+Id flags: --c++ 
+
+The output was:
+1
+c++: error: {CMAKE_CXX_FLAGS}: 没有那个文件或目录
+c++: error: unrecognized command line option ‘--c++’
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: {CMAKE_CXX_FLAGS};-g
+Id flags: --ec++ 
+
+The output was:
+1
+c++: error: {CMAKE_CXX_FLAGS}: 没有那个文件或目录
+c++: error: unrecognized command line option ‘--ec++’; did you mean ‘-Weffc++’?
+
+
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /home/peaceless/code/webServer/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_84987/fast"
+/usr/bin/make -f CMakeFiles/cmTC_84987.dir/build.make CMakeFiles/cmTC_84987.dir/build
+make[1]: 进入目录“/home/peaceless/code/webServer/CMakeFiles/CMakeTmp”
+Building C object CMakeFiles/cmTC_84987.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -o CMakeFiles/cmTC_84987.dir/CheckSymbolExists.c.o   -c /home/peaceless/code/webServer/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_84987
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_84987.dir/link.txt --verbose=1
+/usr/bin/cc      CMakeFiles/cmTC_84987.dir/CheckSymbolExists.c.o  -o cmTC_84987 
+CMakeFiles/cmTC_84987.dir/CheckSymbolExists.c.o：在函数‘main’中：
+CheckSymbolExists.c:(.text+0x1b)：对‘pthread_create’未定义的引用
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_84987.dir/build.make:97: recipe for target 'cmTC_84987' failed
+make[1]: *** [cmTC_84987] Error 1
+make[1]: 离开目录“/home/peaceless/code/webServer/CMakeFiles/CMakeTmp”
+Makefile:126: recipe for target 'cmTC_84987/fast' failed
+make: *** [cmTC_84987/fast] Error 2
+
+File /home/peaceless/code/webServer/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/peaceless/code/webServer/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_6c1db/fast"
+/usr/bin/make -f CMakeFiles/cmTC_6c1db.dir/build.make CMakeFiles/cmTC_6c1db.dir/build
+make[1]: 进入目录“/home/peaceless/code/webServer/CMakeFiles/CMakeTmp”
+Building C object CMakeFiles/cmTC_6c1db.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_6c1db.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.10/Modules/CheckFunctionExists.c
+Linking C executable cmTC_6c1db
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_6c1db.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTC_6c1db.dir/CheckFunctionExists.c.o  -o cmTC_6c1db -lpthreads 
+/usr/bin/ld: 找不到 -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_6c1db.dir/build.make:97: recipe for target 'cmTC_6c1db' failed
+make[1]: *** [cmTC_6c1db] Error 1
+make[1]: 离开目录“/home/peaceless/code/webServer/CMakeFiles/CMakeTmp”
+Makefile:126: recipe for target 'cmTC_6c1db/fast' failed
+make: *** [cmTC_6c1db/fast] Error 2
+
+
