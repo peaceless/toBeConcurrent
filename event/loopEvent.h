@@ -170,6 +170,7 @@ void pEvent::handle()
     {
         bzero(buffer, 100);
         int i = recv(sockfd, buffer, 100, 0);
+        std::cout << buffer << std::endl;
         if (i > 0) {
             handler.Handle(buffer);
             // httpParse.ParseData(buffer);
@@ -228,7 +229,7 @@ TimeWheel::TimeWheel(loopEvent *le)
 {
     LOG_INFO("TimeWheel builded.");
     insertFlag = false;
-    conns.resize(500, 0);
+    conns.resize(500, -1);
     wheel.resize(8);
 }
 TimeWheel::~TimeWheel()
@@ -237,10 +238,12 @@ TimeWheel::~TimeWheel()
 void TimeWheel::Remove(int sock)
 {
     int pos = conns[sock];
-    if (pos == 0) {
+    if (pos == -1) {
         LOG_ERROR("delete a sock not exist.");
+        return ;
     }
     wheel[pos].erase(sock);
+    conns[sock] = -1;
 }
 void TimeWheel::Timer(epoll_event epollEvents[], int eventCount)
 {
@@ -252,7 +255,7 @@ void TimeWheel::Timer(epoll_event epollEvents[], int eventCount)
     for (int i = 0; i < eventCount; i++) {
         sock = epollEvents[i].data.fd;
         int tail = (tik + 7)%8;
-        if (conns[sock] != 0) {
+        if (conns[sock] != -1) {
             int t = conns[sock];
             wheel[t].erase(sock);
             LOG_INFO("update timeout ", sock);
@@ -265,7 +268,6 @@ void TimeWheel::Timer(epoll_event epollEvents[], int eventCount)
             LOG_INFO("remove event ", i);
             le->addErrorEvent(i);
         }
-        // wheel[tik].clear();
     }
     insertFlag = !insertFlag;
 }

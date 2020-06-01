@@ -8,5 +8,5 @@ Makefile
 CMakeFiles/
 build/
 CMakeCache.txt
-CMakeLists.txt
+#CMakeLists.txt
 *.cmake

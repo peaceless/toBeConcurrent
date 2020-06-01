@@ -295,10 +295,6 @@ bool HttpParse::CheckCRLF(std::string::iterator &start, std::string::iterator &e
     return false;
 }
 
-void ParseFormData(std::string &body)
-{
-
-}
 // zero for false, one for over, -1 for data not enough
 int8_t HttpParse::ParseBody(std::string &body)
 {
@@ -310,6 +306,7 @@ int8_t HttpParse::ParseBody(std::string &body)
     if (content_type_data_iterator == httpRequest.headers.end()) {
         if (!isGET)
             return 0;
+        return 1;
     }
     auto content_data_len_iterator = httpRequest.headers.find("Content-Length");
     if (content_data_len_iterator == httpRequest.headers.end())
