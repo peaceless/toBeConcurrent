@@ -5,9 +5,12 @@
 #include "../thread/threadpool.h"
 #include "../event/event.h"
 #include "../event/loopEvent.h"
+#include "../event/logger.hpp"
 
 int main(int argc, char* argv[])
 {
+    LOG_INFO("Server start");
+    LOG_DORECORD();
     std::string address = "127.0.0.1";
     std::shared_ptr<ThreadSafeQueue<int>> th = std::make_shared<ThreadSafeQueue<int> >();
     int listen_port = 8080;

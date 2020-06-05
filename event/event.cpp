@@ -4,7 +4,7 @@ Event::~Event()
 Acceptor::Acceptor(int fd, int listenLimit_, std::shared_ptr<ThreadSafeQueue<int>> th)
     : Event(fd), listenLimit(listenLimit_), events_queue(th) {
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serv_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
     serv_addr.sin_port = htons(8080);
 
     bind(sockfd, reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr));
@@ -34,6 +34,9 @@ void Acceptor::handle()
 
     while ((clientSocketFd
         = accept(sockfd, reinterpret_cast<struct sockaddr *>(&clntAddr), &clntAddrSize)) > 0) {
+	    if (clientSocketFd > 500) {
+		close(clientSocketFd);
+	    }
             events_queue->push(clientSocketFd);
         }
     std::cout << __func__ << clientSocketFd << "end." << std::endl;

@@ -19,9 +19,9 @@
 #define LOG_WARM(...) __LOG(INFO, 2, __VA_ARGS__)
 #define LOG_ERROR(...) __LOG(INFO, 3, __VA_ARGS__)
 
-#define LOG_SETLIMIE(i) Logger::getInstance()->setlimit(i)
-#define LOG_DORECORD() Logger::getInstance()->doRecord()
-#define LOG_EXIT() Logger::getInstance()->exit()
+#define LOG_SETLIMIE(i) Logger::GetInstance()->SetLimit(i)
+#define LOG_DORECORD() Logger::GetInstance()->DoRecord()
+#define LOG_EXIT() Logger::GetInstance()->Exit()
 
 class Logger
 {
@@ -89,6 +89,9 @@ public:
             lk.lock();
         }
         while (!log_queue.empty()) {
+	    if(!record_file.is_open()) {
+		record_file.open(filename, std::ios::out | std::ios::app);
+	    }
             record_file << log_queue.front() << '\n';
             log_queue.pop();
         }
@@ -102,12 +105,20 @@ public:
             lk.lock();
             condition.wait(lk, [this] {return ready || stop;});
             ready = false;
-            std::queue<std::string>::reference pos = log_queue.back();
+            int pos = log_queue.size();
             lk.unlock();
-            while(log_queue.front() != pos) {
-                record_file << log_queue.front() << '\n';
+	    int i = 0;
+	    std::string temp;
+            while(i < pos) {
+	        if (!record_file.is_open()){
+	            record_file.open(filename, std::ios::out | std::ios::app);
+	        }
+		temp = log_queue.front();
+		record_file << temp << '\n';
                 log_queue.pop();
+		i++;
             }
+	    record_file.close();
         }
         lk.lock();
         stop = false;
@@ -127,7 +138,8 @@ public:
             auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::stringstream ss;
             ss << std::put_time(std::localtime(&t), "%Y_%m_%d_%H_%M_%S.log");
-            record_file.open(ss.str(), std::ios::out);
+	    filename = "./log/" + ss.str();
+            record_file.open(filename, std::ios::out | std::ios::app);
             if(record_file.is_open()) {
                 std::thread t([this] { Write();});
                 t.detach();
@@ -141,7 +153,7 @@ public:
 
 private:
     Logger()
-        : limit(100), ready(false), count(0),
+        : limit(5), ready(false), count(0),
           stop(false), do_record(false) {}
 
     struct Level {
@@ -168,6 +180,7 @@ private:
 
     std::queue<std::string> log_queue;
     std::fstream record_file;
+    std::string filename;
 };
 
 #endif

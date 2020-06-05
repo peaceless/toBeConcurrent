@@ -4,7 +4,7 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
-  "/home/peaceless/code/webServer/main/main.cpp" "/home/peaceless/code/webServer/CMakeFiles/WebServer.dir/main/main.cpp.o"
+  "/root/data/webServer/main/main.cpp" "/root/data/webServer/CMakeFiles/WebServer.dir/main/main.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 
@@ -14,7 +14,7 @@ set(CMAKE_CXX_TARGET_INCLUDE_PATH
 
 # Targets to which this target links.
 set(CMAKE_TARGET_LINKED_INFO_FILES
-  "/home/peaceless/code/webServer/CMakeFiles/lib.dir/DependInfo.cmake"
+  "/root/data/webServer/CMakeFiles/lib.dir/DependInfo.cmake"
   )
 
 # Fortran module output directory.
