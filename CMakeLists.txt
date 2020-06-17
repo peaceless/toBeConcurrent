@@ -7,6 +7,11 @@ project(WebServer)
 
 # add pthread add_libray
 link_libraries(-lpthread)
+link_libraries(-ldl)
+link_libraries(${PROJECT_SOURCE_DIR}/lib/libssl.a)
+link_libraries(${PROJECT_SOURCE_DIR}/lib/libcrypto.a)
+include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR})
 
 # set execute file to path
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/build)
@@ -25,5 +30,6 @@ aux_source_directory(./main WEBSERVER)
 # add the executable
 add_executable(WebServer ${WEBSERVER})
 target_link_libraries(WebServer lib)
+
 #target_link_libraries(WebServer httpLib)
 #target_link_libraries(WebServer eventLib)

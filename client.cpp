@@ -10,19 +10,24 @@
 #include <errno.h>
 #include <ctime>
 
+#include "include/openssl/ssl.h"
+#include "include/openssl/err.h"
+
 class Client
 {
 public:
-    Client(std::string server_ip = "127.0.0.1");
+    Client(SSL_CTX *ctx, std::string server_ip = "127.0.0.1");
     void operator()();
     //void connecting();
 
 private:
     sockaddr_in serv_addr;
+    SSL_CTX *m_ctx;
 };
 
-Client::Client(std::string server_ip)
+Client::Client(SSL_CTX *ctx, std::string server_ip)
 {
+    m_ctx = ctx;
     const char *ip = server_ip.c_str();
     bzero(&serv_addr, sizeof(serv_addr));
 
@@ -33,6 +38,7 @@ Client::Client(std::string server_ip)
 
 void Client::operator()()
 {
+    SSL *ssl;
     int i = 0;
     std::clock_t total_time;
     while (i++ < 10)
@@ -53,15 +59,23 @@ void Client::operator()()
         }
         else
         {
+            ssl = SSL_new(m_ctx);
+            SSL_set_fd(ssl, sock);
+            if (SSL_connect(ssl) == -1) {
+                std::cout << "erro in ssl_connect" << std::endl;
+                return ;
+            }
             char remsg[100] = "\0";
             // std::cout << sock << "++" << std::endl;
             std::clock_t start = clock();
-            write(sock, "GET /index.html HTTP/1.1\r\n\r\n", 28);
-            recv(sock, remsg, 100, 0);
+            SSL_write(ssl, "GET /index.html HTTP/1.1\r\n\r\n", 28);
+            SSL_read(ssl, remsg, 100);
             std::clock_t resumeTime = clock() - start;
             total_time += resumeTime;
             // while(recv(sock, remsg, 100, 0) > 0);
             sleep(1);
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
             close(sock);
             // std::cout << sock << "--" << std::endl;
         }
@@ -73,7 +87,16 @@ void Client::operator()()
 
 int main()
 {
-    Client my_client;
+    SSL_CTX *ctx;
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+    ctx = SSL_CTX_new(SSLv23_client_method());
+    if (ctx == NULL) {
+        std::cout << "error in create ctx" << std::endl;
+        exit(1);
+    }
+    Client my_client(ctx);
     std::vector<std::thread> vect;
     for(int i = 0; i < 100; i++)
     {
@@ -82,4 +105,5 @@ int main()
     // my_client();
     for(int i = 0; i < 100; i++)
         vect[i].join();
+    SSL_CTX_free(ctx);
 }

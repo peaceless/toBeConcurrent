@@ -246,6 +246,8 @@ lib/liblib.so: CMakeFiles/lib.dir/httpUnit/httpparse.cpp.o
 lib/liblib.so: CMakeFiles/lib.dir/httpUnit/fast_cgi/fcgi.cpp.o
 lib/liblib.so: CMakeFiles/lib.dir/httpUnit/fast_cgi/tools.cpp.o
 lib/liblib.so: CMakeFiles/lib.dir/build.make
+lib/liblib.so: lib/libssl.a
+lib/liblib.so: lib/libcrypto.a
 lib/liblib.so: CMakeFiles/lib.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/peaceless/code/webServer/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX shared library lib/liblib.so"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/lib.dir/link.txt --verbose=$(VERBOSE)

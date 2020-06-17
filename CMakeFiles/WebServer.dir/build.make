@@ -90,7 +90,11 @@ WebServer_EXTERNAL_OBJECTS =
 
 build/WebServer: CMakeFiles/WebServer.dir/main/main.cpp.o
 build/WebServer: CMakeFiles/WebServer.dir/build.make
+build/WebServer: lib/libssl.a
+build/WebServer: lib/libcrypto.a
 build/WebServer: lib/liblib.so
+build/WebServer: lib/libssl.a
+build/WebServer: lib/libcrypto.a
 build/WebServer: CMakeFiles/WebServer.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/peaceless/code/webServer/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable build/WebServer"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/WebServer.dir/link.txt --verbose=$(VERBOSE)

@@ -5,7 +5,9 @@
 #include "../thread/threadpool.h"
 #include "../event/event.h"
 #include "../event/loopEvent.h"
-
+//#include "../include/openssl/ssl.h"
+#include "openssl/ssl.h"
+#include <openssl/err.h>
 int main(int argc, char* argv[])
 {
     std::string address = "127.0.0.1";

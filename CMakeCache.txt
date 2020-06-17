@@ -194,7 +194,7 @@ eventLib_LIB_DEPENDS:STATIC=general;-lpthread;
 httpLib_LIB_DEPENDS:STATIC=general;-lpthread;
 
 //Dependencies for the target
-lib_LIB_DEPENDS:STATIC=general;-lpthread;
+lib_LIB_DEPENDS:STATIC=general;-lpthread;general;-ldl;general;/home/peaceless/code/webServer/lib/libssl.a;general;/home/peaceless/code/webServer/lib/libcrypto.a;
 
 
 ########################

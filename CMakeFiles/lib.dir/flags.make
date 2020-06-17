@@ -6,5 +6,5 @@ CXX_FLAGS =  -g -fPIC   -std=gnu++11
 
 CXX_DEFINES = -Dlib_EXPORTS
 
-CXX_INCLUDES = 
+CXX_INCLUDES = -I/home/peaceless/code/webServer/include -I/home/peaceless/code/webServer 
 
