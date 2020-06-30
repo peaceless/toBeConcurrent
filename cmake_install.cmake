@@ -1,4 +1,3 @@
-# Install script for directory: /home/peaceless/code/webServer
 # Install script for directory: /root/data/webServer
 
 # Set the install prefix
