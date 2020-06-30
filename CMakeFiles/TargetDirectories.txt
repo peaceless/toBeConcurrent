@@ -1,0 +1,4 @@
+/root/data/webServer/CMakeFiles/edit_cache.dir
+/root/data/webServer/CMakeFiles/WebServer.dir
+/root/data/webServer/CMakeFiles/rebuild_cache.dir
+/root/data/webServer/CMakeFiles/lib.dir

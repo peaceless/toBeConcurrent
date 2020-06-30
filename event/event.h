@@ -1,5 +1,5 @@
-#ifndef EVENT_CPP_
-#define EVENT_CPP_
+#ifndef EVENT_H
+#define EVENT_H
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -70,4 +70,4 @@ private:
 };
 
 
-#endif
+#endif //EVENT_H

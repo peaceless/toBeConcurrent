@@ -1,12 +1,12 @@
 # This file is used to ignore files which are generated
 # ----------------------------------------------------------------------------
-.vscode/
+#.vscode/
 
-lib/
-*.sh
-Makefile
-CMakeFiles/
-build/
-CMakeCache.txt
-CMakeLists.txt
-*.cmake
+#lib/
+#*.sh
+#Makefile
+#CMakeFiles/
+#build/
+#CMakeCache.txt
+#CMakeLists.txt
+#*.cmake

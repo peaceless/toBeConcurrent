@@ -5,9 +5,12 @@
 #include "../thread/threadpool.h"
 #include "../event/event.h"
 #include "../event/loopEvent.h"
+#include "../event/logger.hpp"
 
 int main(int argc, char* argv[])
 {
+    LOG_INFO("Server start");
+    LOG_DORECORD();
     std::string address = "127.0.0.1";
     std::shared_ptr<ThreadSafeQueue<int>> th = std::make_shared<ThreadSafeQueue<int> >();
     int listen_port = 8080;
@@ -19,12 +22,6 @@ int main(int argc, char* argv[])
     server_address.sin_addr.s_addr = inet_addr(address.c_str());
     server_address.sin_port = htons(listen_port);
 
-    // bind(sockfd, reinterpret_cast<sockaddr *>(&server_address), sizeof(server_address));
-    // listen(sockfd, 10);
-    // struct sockaddr_in clnt_addr;
-    // socklen_t size = sizeof(clnt_addr);
-    // int connfd = accept(sockfd,reinterpret_cast<struct sockaddr *>(&clnt_addr), &size);
-    // std::cout << "get conn " << connfd << std::endl;
     ThreadPool* tp = new ThreadPool(5);
     Acceptor ac(sockfd, 500, th);
     ac.init("127.0.0.1", 8080);

@@ -1,0 +1,1 @@
+/usr/bin/x86_64-linux-gnu-g++-7   -g -g   CMakeFiles/WebServer.dir/main/main.cpp.o  -o WebServer -Wl,-rpath,/home/peaceless/code/webServer/build/lib -lpthread lib/libeventLib.so -lpthread 

@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include <errno.h>
+#include <ctime>
 
 class Client
 {
@@ -32,7 +33,9 @@ Client::Client(std::string server_ip)
 
 void Client::operator()()
 {
-    while (1)
+    int i = 0;
+    std::clock_t total_time;
+    while (i++ < 10)
     {
         int sock;
         if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -50,24 +53,33 @@ void Client::operator()()
         }
         else
         {
-            std::cout << sock << "++" << std::endl;
-            write(sock, ".", 1);
-            sleep(2);
+            char remsg[100] = "\0";
+            // std::cout << sock << "++" << std::endl;
+            std::clock_t start = clock();
+            write(sock, "GET /index.html HTTP/1.1\r\n\r\n", 28);
+            recv(sock, remsg, 100, 0);
+            std::clock_t resumeTime = clock() - start;
+            total_time += resumeTime;
+            // while(recv(sock, remsg, 100, 0) > 0);
+            sleep(1);
             close(sock);
-            std::cout << sock << "--" << std::endl;
+            // std::cout << sock << "--" << std::endl;
         }
     }
+    double tt = double(total_time) / CLOCKS_PER_SEC;
+    tt /= 10;
+    std::cout << "time is " << tt << std::endl;
 }
 
 int main()
 {
     Client my_client;
     std::vector<std::thread> vect;
-    for(int i = 0; i < 10; i++)
+    for(int i = 0; i < 100; i++)
     {
         vect.emplace_back(my_client);
     }
     // my_client();
-    for(int i = 0; i < 10; i++)
+    for(int i = 0; i < 100; i++)
         vect[i].join();
 }

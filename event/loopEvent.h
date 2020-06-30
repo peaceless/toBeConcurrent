@@ -4,30 +4,14 @@
 #include <memory>
 // #include <mutex>
 #include <atomic>
-#include "../event/event.h"
+#include "event.h"
 #include "../thread/threadpool.h"
 #include <sys/epoll.h>
 
-class log
-{
-public:
-    log();
-    void out(const std::string &data);
-    template <class T>
-    std::ostream &operator<<(T data);
-    std::mutex mut;
-};
-log::log()
-{
-}
-template <class T>
-std::ostream &log::operator<<(T data)
-{
-    std::lock_guard<std::mutex> lk(mut);
-    return std::cout << data;
-}
+#include "../httpUnit/HttpHandler.h"
+#include "mytimer.h"
+#include "logger.hpp"
 
-log lg;
 class pEvent;
 class loopEvent : public Event
 {
@@ -53,6 +37,7 @@ private:
     std::vector<pEvent *> events_queue;
     std::queue<int> error_queue;
 
+    TimeWheel timeCount;
     std::mutex mut;
 };
 
@@ -67,10 +52,11 @@ public:
     int evcount;
 private:
     loopEvent *le;
+    HttpHandler handler;
 };
 
 loopEvent::loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool *tp)
-    : epfd(fd), fd_queue(th), Event(fd), pool(tp)
+    : epfd(fd), fd_queue(th), Event(fd), pool(tp), timeCount(this)
 {
     events_queue.resize(LIMIT); // all place has a null value
     events_queue[0] = new pEvent(0, this);
@@ -97,43 +83,37 @@ void loopEvent::handle()
             event.data.fd = *event_fd;
             event.events = EPOLLIN | EPOLLET;
             if (epoll_ctl(epfd, EPOLL_CTL_ADD, *event_fd, &event) == -1)
-                lg << __func__ << " error: add event into epoll wrong!" << *event_fd << std::endl;
+                LOG_ERROR("add event into epoll wrong.", *event_fd);
 
             if (events_queue[*event_fd] != nullptr)
             {
-                lg << "-1 error." << std::endl;
-                lg << *event_fd << "is exit." << std::endl;
+                LOG_ERROR(*event_fd, "is exist.-1 error");
                 exit(-1);
             }
-            // lg << *event_fd << " ++" << std::endl;
             events_queue[*event_fd] = new pEvent(*event_fd, this);
             events_queue[*event_fd]->setNonBlock();
             events_queue[0]->sockfd++;
 
             if(max < *event_fd) max = *event_fd;
         }
-        lg << "max is " << max << std::endl;
 
         int eventCount = epoll_wait(epfd, events, LIMIT, LIMIT);
 
+        timeCount.Timer(events, eventCount);
         for (int i = 0; i < eventCount; ++i)
         {
             // XXX : epollerr & epollhup seem like only hanppen when server peer
             if (events[i].events == (EPOLLERR | EPOLLHUP))
             {
                 exit(-1);
-                // addErrorEvent(events[i].data.fd);
-                // lg << "ADD errorEvent " << events[i].data.fd << std::endl;
             } else if (events[i].events == EPOLLIN)
             {
                 std::lock_guard<std::mutex> lk(events_queue[events[i].data.fd]->mut);
                 if (events_queue[events[i].data.fd]->evcount > 0)
                 {
                     events_queue[events[i].data.fd]->evcount ++;
-                    lg << events_queue[events[i].data.fd]->sockfd << events_queue[events[i].data.fd]->evcount << "bigger than zero." << std::endl;
                 } else if (events_queue[events[i].data.fd]->evcount == 0) {
                     events_queue[events[i].data.fd]->evcount ++;
-                    lg << events_queue[events[i].data.fd]->sockfd << "in." << events_queue[events[i].data.fd]->evcount << std::endl;
                     pool->enqueue(&pEvent::handle, events_queue[events[i].data.fd]);
                 }
             }
@@ -149,25 +129,10 @@ void loopEvent::cleanErrorEvent()
     for (int i = 0; i < LIMIT && i < t; i++)
     {
         int p = error_queue.front();
+        timeCount.Remove(p);
         error_queue.pop();
         removeEvent(p);
     }
-    // lg << "now how many links are in queue: " << events_queue[0]->sockfd << std::endl;
-    // int p = 0;
-    // for (int i = 1; i < 50; i++)
-    //     if (events_queue[i] != nullptr)
-    //         p++;
-
-    // if (events_queue[0]->sockfd != p)
-    // {
-    //     lg << "error :" << events_queue[0]->sockfd << " " << p << std::endl;
-    //     for (int i = 0; i < 50; i++)
-    //     {
-    //         lg << events_queue[i]->sockfd << " ";
-    //     }
-    //     lg << "\n" << std::endl;
-    //     exit(-1);
-    // }
 }
 
 void loopEvent::removeEvent(int event_id)
@@ -177,14 +142,13 @@ void loopEvent::removeEvent(int event_id)
     // wait for all thread has handle over this sock
     while (events_queue[event_id]->evcount > 0)
         std::this_thread::yield;
-    lg << "delete " << event_id << std::endl;
     event.data.fd = events_queue[event_id]->sockfd;
     delete events_queue[event_id];
     events_queue[event_id] = nullptr;
 
     if (epoll_ctl(epfd, EPOLL_CTL_DEL, event_id, &event))
     {
-        lg << "...................delete error" << errno << std::endl;
+        LOG_ERROR("delete erro.");
         exit(-1);
     }
     shutdown(event_id, SHUT_RDWR);
@@ -193,30 +157,44 @@ void loopEvent::removeEvent(int event_id)
 }
 
 pEvent::pEvent(int fd, const loopEvent *le_)
-    : Event(fd), le(const_cast<loopEvent *>(le_)), evcount(0)
+    : Event(fd), le(const_cast<loopEvent *>(le_)), evcount(0), handler(fd)
 {
 }
 
 void pEvent::handle()
 {
+    LOG_INFO("handle");
     char buffer[100] = "\0";
     bool flag = false;
-    // while (evcount > 0)
     for (;;)
     {
+        bzero(buffer, 100);
         int i = recv(sockfd, buffer, 100, 0);
+        // std::cout << buffer << std::endl;
         if (i > 0) {
+            handler.Handle(buffer);
+            // httpParse.ParseData(buffer);
+            // HttpRequest result;
+            // result = httpParse.GetResult();
+            // std::cout << "method is " << result.method << std::endl;
+            // std::cout << "url is " << result.url << std::endl;
+            // std::cout << "version is" << result.version << std::endl;
+            // auto it = result.POST_Args.begin();
+            // while (it != result.headers.end()){
+                // std::cout << it->first << it->second << std::endl;
+                // it ++;
+            // }
+            // std::cout << buffer;
             // specify how to deal event
         } else if (i == -1 && errno == EWOULDBLOCK) // read all data from buffer
         {
             std::lock_guard<std::mutex> lk(mut);
             evcount --;
-            lg << evcount << " "<< sockfd << std::this_thread::get_id() << std::endl;
             if (!evcount)
                 break;
             if (evcount < 0)
             {
-                lg << "count of handle has negitive" << std::endl;
+                LOG_ERROR("count fo handle has been negitive.");
                 exit(-1);
             }
         } else if (i == 0)    // client side has closed connection
@@ -225,22 +203,9 @@ void pEvent::handle()
             evcount = -2;   // handle over
             le->addErrorEvent(sockfd);
             break;
-            // evcount --;
-            // lg << evcount << "==" << sockfd << std::this_thread::get_id() << std::endl;
-            // if (!flag)
-            // {
-            //     le->addErrorEvent(sockfd);
-            //     flag = true;
-            // }
-            // if (!evcount)
-            //     break;
-            // if (evcount < 0)
-            // {
-            //     lg << "wrong" << std::endl;
-            //     exit(-1);
-            // }
         }
     }
+    LOG_INFO("handle over.");
 }
 
 void pEvent::setNonBlock()
@@ -258,5 +223,52 @@ void pEvent::setNonBlock()
         perror("fcntl(sock, SETFL, opts)");
         return;
     }
+}
+TimeWheel::TimeWheel(loopEvent *le)
+    : le(le), tik(0)
+{
+    LOG_INFO("TimeWheel builded.");
+    insertFlag = false;
+    conns.resize(500, -1);
+    wheel.resize(8);
+}
+TimeWheel::~TimeWheel()
+{
+}
+void TimeWheel::Remove(int sock)
+{
+    int pos = conns[sock];
+    if (pos == -1) {
+        LOG_ERROR("delete a sock not exist.");
+        return ;
+    }
+    wheel[pos].erase(sock);
+    conns[sock] = -1;
+}
+void TimeWheel::Timer(epoll_event epollEvents[], int eventCount)
+{
+    if (insertFlag) {
+        tik ++;
+        tik = tik % 8;
+    }
+    int sock;
+    for (int i = 0; i < eventCount; i++) {
+        sock = epollEvents[i].data.fd;
+        int tail = (tik + 7)%8;
+        if (conns[sock] != -1) {
+            int t = conns[sock];
+            wheel[t].erase(sock);
+            LOG_INFO("update timeout ", sock);
+        }
+        wheel[tail].insert(sock);
+        conns[sock] = tail;
+    }
+    if (insertFlag) {
+        for (int i : wheel[tik]) {
+            LOG_INFO("remove event ", i);
+            le->addErrorEvent(i);
+        }
+    }
+    insertFlag = !insertFlag;
 }
 #endif

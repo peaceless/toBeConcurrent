@@ -1,0 +1,20 @@
+{
+    // https://code.visualstudio.com/docs/editor/tasks
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build", // 任务名字叫Build，在launch中使用
+            "type": "shell", //任务执行shell命令
+            "command": "./build.sh", // 命令是g++
+            // "args": 
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc" // 使用gcc捕获错误
+            ]
+        }
+        // 执行内容为 g++ ./* -o webserver
+    ]
+}

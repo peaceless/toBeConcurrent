@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -g  -shared -Wl,-soname,libhttpLib.so -o lib/libhttpLib.so CMakeFiles/httpLib.dir/httpUnit/HttpHandler.cpp.o CMakeFiles/httpLib.dir/httpUnit/httpparse.cpp.o -lpthread 
