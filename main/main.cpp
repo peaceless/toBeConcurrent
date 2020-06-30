@@ -5,8 +5,14 @@
 #include "../thread/threadpool.h"
 #include "../event/event.h"
 #include "../event/loopEvent.h"
+<<<<<<< HEAD
+//#include "../include/openssl/ssl.h"
+#include "openssl/ssl.h"
+#include <openssl/err.h>
+=======
 #include "../event/logger.hpp"
 
+>>>>>>> master
 int main(int argc, char* argv[])
 {
     LOG_INFO("Server start");

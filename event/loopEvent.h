@@ -12,11 +12,15 @@
 #include "mytimer.h"
 #include "logger.hpp"
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 class pEvent;
 class loopEvent : public Event
 {
 public:
     loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool *tp);
+    ~loopEvent();
     void operator()();
     void addErrorEvent(int fd);
     void handle() override;
@@ -39,6 +43,8 @@ private:
 
     TimeWheel timeCount;
     std::mutex mut;
+
+    SSL_CTX *ctx;
 };
 
 class pEvent : public Event
@@ -46,20 +52,37 @@ class pEvent : public Event
 public:
     void setNonBlock();
     void handle() override;
-    pEvent(int fd, const loopEvent *le_);
+    pEvent(int fd, const loopEvent *le_, SSL_CTX * ctx);
+    ~pEvent();
 
     std::mutex mut;
     int evcount;
 private:
     loopEvent *le;
     HttpHandler handler;
+
+    SSL *ssl;
 };
 
 loopEvent::loopEvent(int fd, std::shared_ptr<ThreadSafeQueue<int>> th, ThreadPool *tp)
     : epfd(fd), fd_queue(th), Event(fd), pool(tp), timeCount(this)
 {
+    // load ssl module
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+    ctx = SSL_CTX_new(SSLv23_server_method());
+    if (ctx == NULL) {
+        ERR_print_errors_fp(stdout);
+        exit(1);
+    }
     events_queue.resize(LIMIT); // all place has a null value
-    events_queue[0] = new pEvent(0, this);
+    events_queue[0] = new pEvent(0, this, ctx);
+}
+loopEvent::~loopEvent()
+{
+    close(epfd);
+    SSL_CTX_free(ctx);
 }
 void loopEvent::addErrorEvent(int fd)
 {
@@ -90,7 +113,7 @@ void loopEvent::handle()
                 LOG_ERROR(*event_fd, "is exist.-1 error");
                 exit(-1);
             }
-            events_queue[*event_fd] = new pEvent(*event_fd, this);
+            events_queue[*event_fd] = new pEvent(*event_fd, this, ctx);
             events_queue[*event_fd]->setNonBlock();
             events_queue[0]->sockfd++;
 
@@ -156,36 +179,30 @@ void loopEvent::removeEvent(int event_id)
     events_queue[0]->sockfd--;
 }
 
-pEvent::pEvent(int fd, const loopEvent *le_)
+pEvent::pEvent(int fd, const loopEvent *le_, SSL_CTX *ctx)
     : Event(fd), le(const_cast<loopEvent *>(le_)), evcount(0), handler(fd)
 {
+    ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, fd);
+    if (SSL_accept(ssl) == -1) {
+        LOG_ERROR("create ssl link failed.", fd);
+        close(fd);
+        exit(-1);
+    }
 }
 
 void pEvent::handle()
 {
     LOG_INFO("handle");
-    char buffer[100] = "\0";
+    char buffer[1024] = "\0";
+    int buffer_size = sizeof(buffer);
     bool flag = false;
     for (;;)
     {
-        bzero(buffer, 100);
-        int i = recv(sockfd, buffer, 100, 0);
-        // std::cout << buffer << std::endl;
+        bzero(buffer, buffer_size);
+        int i = SSL_read(ssl, buffer, buffer_size);
         if (i > 0) {
             handler.Handle(buffer);
-            // httpParse.ParseData(buffer);
-            // HttpRequest result;
-            // result = httpParse.GetResult();
-            // std::cout << "method is " << result.method << std::endl;
-            // std::cout << "url is " << result.url << std::endl;
-            // std::cout << "version is" << result.version << std::endl;
-            // auto it = result.POST_Args.begin();
-            // while (it != result.headers.end()){
-                // std::cout << it->first << it->second << std::endl;
-                // it ++;
-            // }
-            // std::cout << buffer;
-            // specify how to deal event
         } else if (i == -1 && errno == EWOULDBLOCK) // read all data from buffer
         {
             std::lock_guard<std::mutex> lk(mut);
@@ -223,6 +240,12 @@ void pEvent::setNonBlock()
         perror("fcntl(sock, SETFL, opts)");
         return;
     }
+}
+
+pEvent::~pEvent()
+{
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
 }
 TimeWheel::TimeWheel(loopEvent *le)
     : le(le), tik(0)
