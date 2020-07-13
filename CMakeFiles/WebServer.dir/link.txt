@@ -1,5 +1,0 @@
-<<<<<<< HEAD
-/usr/bin/c++   -g   CMakeFiles/WebServer.dir/main/main.cpp.o  -o build/WebServer -Wl,-rpath,/home/peaceless/code/webServer/lib -lpthread -ldl lib/libssl.a lib/libcrypto.a lib/liblib.so -lpthread -ldl lib/libssl.a lib/libcrypto.a 
-=======
-/usr/bin/c++   -g   CMakeFiles/WebServer.dir/main/main.cpp.o  -o build/WebServer -Wl,-rpath,/root/data/webServer/lib -lpthread lib/liblib.so -lpthread 
->>>>>>> master

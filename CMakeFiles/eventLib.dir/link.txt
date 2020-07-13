@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC  -g  -shared -Wl,-soname,libeventLib.so -o lib/libeventLib.so CMakeFiles/eventLib.dir/event/event.cpp.o -lpthread 
